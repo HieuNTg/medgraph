@@ -1,9 +1,10 @@
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import { useEffect } from "react";
-import { ArrowLeft, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, RotateCcw, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RiskSummary } from "@/components/risk-summary";
 import { InteractionCard } from "@/components/interaction-card";
+import { InteractionGraph } from "@/components/interaction-graph";
 import type { CheckResponse, InteractionResult } from "@/lib/types";
 
 const SEVERITY_ORDER: Record<string, number> = {
@@ -28,6 +29,9 @@ export function ResultsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as ResultsState | null;
+  const [showGraph, setShowGraph] = useState(true);
+  const graphContainerRef = useRef<HTMLDivElement>(null);
+  const [graphWidth, setGraphWidth] = useState(700);
 
   useEffect(() => {
     if (!state?.result) {
@@ -35,10 +39,28 @@ export function ResultsPage() {
     }
   }, [state, navigate]);
 
+  // Responsive graph width
+  useEffect(() => {
+    const el = graphContainerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setGraphWidth(Math.max(300, entry.contentRect.width));
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   if (!state?.result) return null;
 
   const { result } = state;
   const sorted = sortBySeverity(result.interactions);
+
+  // Check if graph has meaningful data to show
+  const hasGraphData =
+    result.drugs.some((d) => d.enzyme_relations.length > 0) ||
+    result.interactions.some((i) => i.cascade_paths.length > 0);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
@@ -54,6 +76,38 @@ export function ResultsPage() {
 
       {/* Risk summary */}
       <RiskSummary response={result} />
+
+      {/* Knowledge Graph Visualization */}
+      {hasGraphData && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
+              <Network className="h-5 w-5 text-[var(--primary)]" />
+              Interaction Network
+            </h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowGraph((p) => !p)}
+            >
+              {showGraph ? "Hide" : "Show"} Graph
+            </Button>
+          </div>
+          {showGraph && (
+            <div ref={graphContainerRef}>
+              <InteractionGraph
+                data={result}
+                width={graphWidth}
+                height={450}
+              />
+              <p className="text-xs text-[var(--muted-foreground)] mt-2">
+                Drag nodes to rearrange. Scroll to zoom. Blue circles = drugs,
+                amber rectangles = enzymes.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Drug list */}
       <div className="space-y-1">
