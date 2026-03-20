@@ -4,7 +4,6 @@ import { ArrowLeft, Pill, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MedicalDisclaimer } from "@/components/medical-disclaimer";
 import { getDrug } from "@/lib/api";
 
 const RELATION_LABELS: Record<string, string> = {
@@ -143,8 +142,6 @@ export function DrugInfoPage() {
           <Link to="/checker">Check Interactions with {drug.name}</Link>
         </Button>
       </div>
-
-      <MedicalDisclaimer />
     </div>
   );
 }

@@ -4,7 +4,6 @@ import { ArrowLeft, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RiskSummary } from "@/components/risk-summary";
 import { InteractionCard } from "@/components/interaction-card";
-import { MedicalDisclaimer } from "@/components/medical-disclaimer";
 import type { CheckResponse, InteractionResult } from "@/lib/types";
 
 const SEVERITY_ORDER: Record<string, number> = {
@@ -105,8 +104,6 @@ export function ResultsPage() {
           </Link>
         </Button>
       </div>
-
-      <MedicalDisclaimer />
     </div>
   );
 }

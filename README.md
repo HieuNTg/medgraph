@@ -40,13 +40,13 @@ The difference is **cascade analysis**. MEDGRAPH models each drug's relationship
 
 ## Screenshots
 
-| Home | Drug Checker | Results |
-|------|-------------|---------|
-| ![Home](screenshots/01-home.png) | ![Checker](screenshots/02-checker.png) | ![Results](screenshots/06-results.png) |
+| Home | Drug Checker | Autocomplete |
+|------|-------------|-------------|
+| ![Home](screenshots/01-home.png) | ![Checker](screenshots/02-checker.png) | ![Autocomplete](screenshots/03-autocomplete.png) |
 
-| Evidence Trail | Cascade (Keto+Simva) | Dark Mode |
-|---------------|---------------------|-----------|
-| ![Evidence](screenshots/07-results-evidence.png) | ![Cascade](screenshots/08-cascade-keto-simva.png) | ![Dark](screenshots/09-dark-mode.png) |
+| Drugs Selected | Results | Dark Mode |
+|---------------|---------|-----------|
+| ![Selected](screenshots/04-drugs-selected.png) | ![Results](screenshots/05-results.png) | ![Dark](screenshots/06-dark-mode.png) |
 
 ---
 

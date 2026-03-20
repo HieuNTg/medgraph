@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Shield, AlertCircle } from "lucide-react";
 import { DrugInput } from "@/components/drug-input";
-import { MedicalDisclaimer } from "@/components/medical-disclaimer";
 import { Progress } from "@/components/ui/progress";
 import { checkInteractions } from "@/lib/api";
 
@@ -96,8 +95,6 @@ export function CheckerPage() {
           </div>
         </div>
       )}
-
-      <MedicalDisclaimer />
     </div>
   );
 }

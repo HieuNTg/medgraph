@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { Shield, Network, FileSearch, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { MedicalDisclaimer } from "@/components/medical-disclaimer";
 import { getStats } from "@/lib/api";
 
 const FEATURES = [
@@ -188,10 +187,6 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* Disclaimer */}
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <MedicalDisclaimer />
-      </section>
     </div>
   );
 }
