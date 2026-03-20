@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: #ffffff;
+    --foreground: #0f172a;
+    --card: #f8fafc;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --primary: #2563eb;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #0f172a;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    --accent: #f1f5f9;
+    --accent-foreground: #0f172a;
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #2563eb;
+    --radius: 0.5rem;
+
+    --color-critical: #dc2626;
+    --color-major: #ea580c;
+    --color-moderate: #ca8a04;
+    --color-minor: #2563eb;
+    --color-safe: #16a34a;
+  }
+
+  .dark {
+    --background: #020617;
+    --foreground: #f1f5f9;
+    --card: #0f172a;
+    --card-foreground: #f1f5f9;
+    --popover: #0f172a;
+    --popover-foreground: #f1f5f9;
+    --primary: #3b82f6;
+    --primary-foreground: #ffffff;
+    --secondary: #1e293b;
+    --secondary-foreground: #f1f5f9;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --accent: #1e293b;
+    --accent-foreground: #f1f5f9;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #1e293b;
+    --input: #1e293b;
+    --ring: #3b82f6;
+  }
+
+  * {
+    border-color: var(--border);
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  .severity-critical { color: var(--color-critical); }
+  .severity-major { color: var(--color-major); }
+  .severity-moderate { color: var(--color-moderate); }
+  .severity-minor { color: var(--color-minor); }
+  .severity-safe { color: var(--color-safe); }
+
+  .bg-severity-critical { background-color: var(--color-critical); }
+  .bg-severity-major { background-color: var(--color-major); }
+  .bg-severity-moderate { background-color: var(--color-moderate); }
+  .bg-severity-minor { background-color: var(--color-minor); }
+
+  .border-severity-critical { border-color: var(--color-critical); }
+  .border-severity-major { border-color: var(--color-major); }
+  .border-severity-moderate { border-color: var(--color-moderate); }
+  .border-severity-minor { border-color: var(--color-minor); }
+}

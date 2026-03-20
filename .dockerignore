@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+coverage.xml
+.coverage
+
+# Node
+dashboard/node_modules/
+dashboard/.vite/
+
+# Data (use volume mount in production)
+data/
+
+# Dev / editor
+.env
+.env.*
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.github/
+
+# Docs (not needed in image)
+docs/
+screenshots/
+plans/
+
+# OS
+.DS_Store
+Thumbs.db
