@@ -31,7 +31,6 @@ INTERACTIONS_EXPANDED: list[dict] = [
     # =========================================================================
     # CYP3A4 Inhibitor + Substrate Interactions
     # =========================================================================
-
     # --- Itraconazole (strong CYP3A4 inhibitor, already in seed_data.py) ---
     {
         "id": "INT-expanded-001",
@@ -385,11 +384,9 @@ INTERACTIONS_EXPANDED: list[dict] = [
         "source": "fda_label",
         "evidence_count": 0,
     },
-
     # =========================================================================
     # CYP2D6 Inhibitor + Substrate Interactions
     # =========================================================================
-
     {
         "id": "INT-expanded-026",
         "drug_a_id": "DB00715_par",  # Paroxetine
@@ -576,11 +573,9 @@ INTERACTIONS_EXPANDED: list[dict] = [
         "source": "fda_label",
         "evidence_count": 0,
     },
-
     # =========================================================================
     # CYP2C19 Inhibitor + Substrate Interactions
     # =========================================================================
-
     {
         "id": "INT-expanded-039",
         "drug_a_id": "DB00176",  # Fluvoxamine (already in seed_data.py)
@@ -683,11 +678,9 @@ INTERACTIONS_EXPANDED: list[dict] = [
         "source": "fda_label",
         "evidence_count": 0,
     },
-
     # =========================================================================
     # CYP1A2 Interactions
     # =========================================================================
-
     {
         "id": "INT-expanded-046",
         "drug_a_id": "DB00176",  # Fluvoxamine
@@ -747,11 +740,9 @@ INTERACTIONS_EXPANDED: list[dict] = [
         "source": "fda_label",
         "evidence_count": 0,
     },
-
     # =========================================================================
     # Food-Drug Interactions (Grapefruit, St. John's Wort)
     # =========================================================================
-
     {
         "id": "INT-expanded-050",
         "drug_a_id": "DB_GRAPE",  # Grapefruit
@@ -911,11 +902,9 @@ INTERACTIONS_EXPANDED: list[dict] = [
         "source": "fda_label",
         "evidence_count": 0,
     },
-
     # =========================================================================
     # DOAC Interactions (Apixaban, Rivaroxaban, Dabigatran, Edoxaban)
     # =========================================================================
-
     {
         "id": "INT-expanded-061",
         "drug_a_id": "DB01026",  # Ketoconazole (already in seed_data.py)
@@ -1002,11 +991,9 @@ INTERACTIONS_EXPANDED: list[dict] = [
         "source": "fda_label",
         "evidence_count": 0,
     },
-
     # =========================================================================
     # Serotonin Syndrome Interactions
     # =========================================================================
-
     {
         "id": "INT-expanded-067",
         "drug_a_id": "DB00601",  # Linezolid
@@ -1097,11 +1084,9 @@ INTERACTIONS_EXPANDED: list[dict] = [
         "source": "fda_label",
         "evidence_count": 0,
     },
-
     # =========================================================================
     # CYP Enzyme Inducers + Substrates
     # =========================================================================
-
     {
         "id": "INT-expanded-073",
         "drug_a_id": "DB00625_efv",  # Efavirenz
@@ -1374,419 +1359,1136 @@ DRUG_ENZYME_RELATIONS_EXPANDED: list[dict] = [
     # Antifungals
     # -------------------------------------------------------------------------
     # Posaconazole — strong CYP3A4 inhibitor
-    {"drug_id": "DB00834", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "strong"},
-    {"drug_id": "DB00834", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00834",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00834",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Terbinafine — potent CYP2D6 inhibitor
-    {"drug_id": "DB00857", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "strong"},
-    {"drug_id": "DB00857", "enzyme_id": "CYP1A2", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00857", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00857", "enzyme_id": "CYP2C9", "relation_type": "metabolized_by", "strength": "weak"},
-
+    {
+        "drug_id": "DB00857",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "inhibits",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00857",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00857",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00857",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "metabolized_by",
+        "strength": "weak",
+    },
     # -------------------------------------------------------------------------
     # Antibiotics
     # -------------------------------------------------------------------------
     # Erythromycin — moderate-strong CYP3A4 inhibitor
-    {"drug_id": "DB01111", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "strong"},
-    {"drug_id": "DB01111", "enzyme_id": "PGLYCO", "relation_type": "inhibits", "strength": "moderate"},
-    {"drug_id": "DB01111", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB01111",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB01111",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB01111",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Levofloxacin — mild CYP1A2 inhibitor
     {"drug_id": "DB00500", "enzyme_id": "CYP1A2", "relation_type": "inhibits", "strength": "weak"},
-
     # Doxycycline — minimal CYP involvement
     # (no significant enzyme relations)
-
     # Metronidazole — CYP2C9 inhibitor
-    {"drug_id": "DB01142", "enzyme_id": "CYP2C9", "relation_type": "inhibits", "strength": "moderate"},
+    {
+        "drug_id": "DB01142",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     {"drug_id": "DB01142", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "weak"},
-
     # Trimethoprim — CYP2C8 and OCT2 (no listed enzymes in our set)
     # No matching enzyme IDs for CYP2C8 — skip
-
     # Sulfamethoxazole — CYP2C9 inhibitor
-    {"drug_id": "DB01015", "enzyme_id": "CYP2C9", "relation_type": "inhibits", "strength": "moderate"},
-
+    {
+        "drug_id": "DB01015",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     # Linezolid — minimal CYP metabolism
     # (no significant CYP enzyme relations)
-
     # Isoniazid — CYP2C9 and CYP2C19 inhibitor
-    {"drug_id": "DB01051", "enzyme_id": "CYP2C9", "relation_type": "inhibits", "strength": "moderate"},
-    {"drug_id": "DB01051", "enzyme_id": "CYP2C19", "relation_type": "inhibits", "strength": "moderate"},
+    {
+        "drug_id": "DB01051",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB01051",
+        "enzyme_id": "CYP2C19",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     {"drug_id": "DB01051", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "weak"},
-
     # -------------------------------------------------------------------------
     # Antivirals / Antiretrovirals
     # -------------------------------------------------------------------------
     # Atazanavir — strong CYP3A4 and UGT1A1 inhibitor
-    {"drug_id": "DB01072", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "strong"},
+    {
+        "drug_id": "DB01072",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "strong",
+    },
     {"drug_id": "DB01072", "enzyme_id": "UGTA1", "relation_type": "inhibits", "strength": "strong"},
-    {"drug_id": "DB01072", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01072",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Lopinavir — strong CYP3A4 inhibitor (boosted with ritonavir)
-    {"drug_id": "DB01601", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "strong"},
-    {"drug_id": "DB01601", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01601",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB01601",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Sofosbuvir — P-gp substrate
-    {"drug_id": "DB06290", "enzyme_id": "PGLYCO", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB06290",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Cobicistat — strong CYP3A4 inhibitor
-    {"drug_id": "DB01068", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "strong"},
-
+    {
+        "drug_id": "DB01068",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "strong",
+    },
     # Efavirenz — CYP3A4 and CYP2B6 inducer; CYP2B6 substrate
-    {"drug_id": "DB00625_efv", "enzyme_id": "CYP3A4", "relation_type": "induces", "strength": "moderate"},
-    {"drug_id": "DB00625_efv", "enzyme_id": "CYP2B6", "relation_type": "induces", "strength": "moderate"},
-    {"drug_id": "DB00625_efv", "enzyme_id": "CYP2B6", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00625_efv", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00625_efv", "enzyme_id": "CYP2C9", "relation_type": "inhibits", "strength": "weak"},
-    {"drug_id": "DB00625_efv", "enzyme_id": "CYP2C19", "relation_type": "inhibits", "strength": "weak"},
-
+    {
+        "drug_id": "DB00625_efv",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "induces",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00625_efv",
+        "enzyme_id": "CYP2B6",
+        "relation_type": "induces",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00625_efv",
+        "enzyme_id": "CYP2B6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00625_efv",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00625_efv",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "inhibits",
+        "strength": "weak",
+    },
+    {
+        "drug_id": "DB00625_efv",
+        "enzyme_id": "CYP2C19",
+        "relation_type": "inhibits",
+        "strength": "weak",
+    },
     # Nevirapine — moderate CYP3A4 and CYP2B6 inducer
-    {"drug_id": "DB00238", "enzyme_id": "CYP3A4", "relation_type": "induces", "strength": "moderate"},
-    {"drug_id": "DB00238", "enzyme_id": "CYP2B6", "relation_type": "induces", "strength": "moderate"},
-    {"drug_id": "DB00238", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00238", "enzyme_id": "CYP2B6", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00238",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "induces",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00238",
+        "enzyme_id": "CYP2B6",
+        "relation_type": "induces",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00238",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00238",
+        "enzyme_id": "CYP2B6",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # -------------------------------------------------------------------------
     # Cardiovascular
     # -------------------------------------------------------------------------
     # Nifedipine — CYP3A4 substrate
-    {"drug_id": "DB01107", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01107",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Dronedarone — moderate CYP3A4 inhibitor; CYP3A4 substrate; P-gp inhibitor
-    {"drug_id": "DB00519", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "moderate"},
-    {"drug_id": "DB00519", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "moderate"},
-    {"drug_id": "DB00519", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00519", "enzyme_id": "PGLYCO", "relation_type": "inhibits", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00519",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00519",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00519",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00519",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     # Propranolol — CYP2D6 and CYP1A2 substrate
-    {"drug_id": "DB00571", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00571", "enzyme_id": "CYP1A2", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00571",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00571",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Carvedilol — CYP2D6 and CYP2C9 substrate; P-gp substrate
-    {"drug_id": "DB01136", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB01136", "enzyme_id": "CYP2C9", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB01136", "enzyme_id": "PGLYCO", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB01136",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB01136",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB01136",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Bisoprolol — CYP3A4 substrate (partial)
-    {"drug_id": "DB00612", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00612",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Eplerenone — exclusive CYP3A4 substrate
-    {"drug_id": "DB01409", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01409",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # -------------------------------------------------------------------------
     # Antidepressants
     # -------------------------------------------------------------------------
     # Paroxetine — potent CYP2D6 inhibitor and substrate
-    {"drug_id": "DB00715_par", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "strong"},
-    {"drug_id": "DB00715_par", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00715_par",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "inhibits",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00715_par",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Bupropion — potent CYP2D6 inhibitor; CYP2B6 substrate
-    {"drug_id": "DB01156", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "strong"},
-    {"drug_id": "DB01156", "enzyme_id": "CYP2B6", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01156",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "inhibits",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB01156",
+        "enzyme_id": "CYP2B6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Venlafaxine — CYP2D6 substrate (primary); mild CYP2D6 inhibitor
-    {"drug_id": "DB00831", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00831", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
+    {
+        "drug_id": "DB00831",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00831",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     {"drug_id": "DB00831", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "weak"},
-
     # Mirtazapine — CYP1A2, CYP2D6, CYP3A4 substrates
-    {"drug_id": "DB00370", "enzyme_id": "CYP1A2", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00370", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00370", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00370",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00370",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00370",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Nortriptyline — CYP2D6 primary substrate
-    {"drug_id": "DB00540", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00540", "enzyme_id": "CYP2C19", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00540",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00540",
+        "enzyme_id": "CYP2C19",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Desipramine — CYP2D6 primary substrate
-    {"drug_id": "DB01151", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01151",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Trazodone — CYP3A4 substrate
-    {"drug_id": "DB00656", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00656",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # -------------------------------------------------------------------------
     # Antipsychotics
     # -------------------------------------------------------------------------
     # Aripiprazole — CYP2D6 (primary) and CYP3A4 substrates
-    {"drug_id": "DB01246", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB01246", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB01246",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB01246",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Quetiapine — CYP3A4 exclusive substrate
-    {"drug_id": "DB01224", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01224",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Olanzapine — CYP1A2 primary; UGT conjugation
-    {"drug_id": "DB00334", "enzyme_id": "CYP1A2", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00334", "enzyme_id": "UGTA1", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00334",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00334",
+        "enzyme_id": "UGTA1",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Clozapine — CYP1A2 primary; CYP3A4 secondary
-    {"drug_id": "DB00363", "enzyme_id": "CYP1A2", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00363", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00363", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "weak"},
-
+    {
+        "drug_id": "DB00363",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00363",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00363",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "weak",
+    },
     # Ziprasidone — mainly aldehyde oxidase; minor CYP3A4
-    {"drug_id": "DB00246", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "weak"},
-
+    {
+        "drug_id": "DB00246",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "weak",
+    },
     # -------------------------------------------------------------------------
     # Anticonvulsants
     # -------------------------------------------------------------------------
     # Topiramate — mild CYP3A4 inducer; CYP2C19 inhibitor
     {"drug_id": "DB00752", "enzyme_id": "CYP3A4", "relation_type": "induces", "strength": "weak"},
     {"drug_id": "DB00752", "enzyme_id": "CYP2C19", "relation_type": "inhibits", "strength": "weak"},
-
     # Levetiracetam — minimal CYP metabolism
     # (no significant enzyme relations)
-
     # Lamotrigine — UGT-metabolized (UGT1A4 primarily)
-    {"drug_id": "DB00228", "enzyme_id": "UGTA1", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00228",
+        "enzyme_id": "UGTA1",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Oxcarbazepine — moderate CYP3A4 inducer; CYP2C19 inhibitor
-    {"drug_id": "DB00949", "enzyme_id": "CYP3A4", "relation_type": "induces", "strength": "moderate"},
-    {"drug_id": "DB00949", "enzyme_id": "CYP2C19", "relation_type": "inhibits", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00949",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "induces",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00949",
+        "enzyme_id": "CYP2C19",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     # Lacosamide — CYP2C19 substrate
-    {"drug_id": "DB06218", "enzyme_id": "CYP2C19", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB06218",
+        "enzyme_id": "CYP2C19",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # -------------------------------------------------------------------------
     # Benzodiazepines
     # -------------------------------------------------------------------------
     # Triazolam — exclusively CYP3A4
-    {"drug_id": "DB00897", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00897",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Lorazepam — UGT-metabolized
-    {"drug_id": "DB00183", "enzyme_id": "UGTA1", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00183",
+        "enzyme_id": "UGTA1",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Clonazepam — CYP3A4 (nitro reduction)
-    {"drug_id": "DB00564_clz", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00564_clz",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # -------------------------------------------------------------------------
     # Opioids
     # -------------------------------------------------------------------------
     # Hydrocodone — CYP2D6 and CYP3A4
-    {"drug_id": "DB00956", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00956", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00956",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00956",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Fentanyl — exclusively CYP3A4
-    {"drug_id": "DB00813", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00813",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Buprenorphine — primarily CYP3A4
-    {"drug_id": "DB00921", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00921", "enzyme_id": "UGTA1", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00921",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00921",
+        "enzyme_id": "UGTA1",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Naloxone — UGT-metabolized
-    {"drug_id": "DB01183", "enzyme_id": "UGTA1", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01183",
+        "enzyme_id": "UGTA1",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # -------------------------------------------------------------------------
     # Immunosuppressants
     # -------------------------------------------------------------------------
     # Sirolimus — CYP3A4 and P-gp substrate
-    {"drug_id": "DB00877", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00877", "enzyme_id": "PGLYCO", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00877",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00877",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Everolimus — CYP3A4 and P-gp substrate
-    {"drug_id": "DB01590", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB01590", "enzyme_id": "PGLYCO", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01590",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB01590",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Mycophenolate mofetil — UGT-metabolized
-    {"drug_id": "DB00864_myco", "enzyme_id": "UGTA1", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00864_myco",
+        "enzyme_id": "UGTA1",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # -------------------------------------------------------------------------
     # Oncology
     # -------------------------------------------------------------------------
     # Imatinib — CYP3A4 (primary); inhibits CYP2D6 and CYP3A4
-    {"drug_id": "DB01030", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB01030", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "moderate"},
+    {
+        "drug_id": "DB01030",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB01030",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     {"drug_id": "DB01030", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "weak"},
-
     # Erlotinib — CYP3A4 primary; CYP1A2 secondary
-    {"drug_id": "DB00530", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00530", "enzyme_id": "CYP1A2", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00530",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00530",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Crizotinib — CYP3A4 substrate and moderate inhibitor
-    {"drug_id": "DB08865", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB08865", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "moderate"},
-
+    {
+        "drug_id": "DB08865",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB08865",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     # -------------------------------------------------------------------------
     # Food / Supplements
     # -------------------------------------------------------------------------
     # Grapefruit — intestinal CYP3A4 inhibitor
-    {"drug_id": "DB_GRAPE", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "strong"},
+    {
+        "drug_id": "DB_GRAPE",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "strong",
+    },
     {"drug_id": "DB_GRAPE", "enzyme_id": "PGLYCO", "relation_type": "inhibits", "strength": "weak"},
-
     # St. John's Wort — CYP3A4 and P-gp inducer
     {"drug_id": "DB_STJ", "enzyme_id": "CYP3A4", "relation_type": "induces", "strength": "strong"},
     {"drug_id": "DB_STJ", "enzyme_id": "PGLYCO", "relation_type": "induces", "strength": "strong"},
-    {"drug_id": "DB_STJ", "enzyme_id": "CYP2C9", "relation_type": "induces", "strength": "moderate"},
-
+    {
+        "drug_id": "DB_STJ",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "induces",
+        "strength": "moderate",
+    },
     # Turmeric/Curcumin — mild inhibitor at high doses
-    {"drug_id": "DB_TURMERIC", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "weak"},
-    {"drug_id": "DB_TURMERIC", "enzyme_id": "CYP2C9", "relation_type": "inhibits", "strength": "weak"},
-    {"drug_id": "DB_TURMERIC", "enzyme_id": "CYP1A2", "relation_type": "inhibits", "strength": "weak"},
-
+    {
+        "drug_id": "DB_TURMERIC",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "weak",
+    },
+    {
+        "drug_id": "DB_TURMERIC",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "inhibits",
+        "strength": "weak",
+    },
+    {
+        "drug_id": "DB_TURMERIC",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "inhibits",
+        "strength": "weak",
+    },
     # -------------------------------------------------------------------------
     # Others
     # -------------------------------------------------------------------------
     # Dextromethorphan — CYP2D6 primary; CYP3A4 secondary
-    {"drug_id": "DB00514", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00514", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00514",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00514",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Aminophylline -> theophylline: CYP1A2
-    {"drug_id": "DB00277_ami", "enzyme_id": "CYP1A2", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00277_ami",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Sildenafil — CYP3A4 primary; CYP2C9 secondary
-    {"drug_id": "DB00203", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00203", "enzyme_id": "CYP2C9", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00203",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00203",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Tadalafil — exclusively CYP3A4
-    {"drug_id": "DB01299", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01299",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Colchicine — CYP3A4 and P-gp substrate
-    {"drug_id": "DB01394", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB01394", "enzyme_id": "PGLYCO", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01394",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB01394",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Apixaban — CYP3A4 and P-gp substrate
-    {"drug_id": "DB06605", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB06605", "enzyme_id": "PGLYCO", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB06605",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB06605",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Edoxaban — P-gp substrate (minimal CYP)
-    {"drug_id": "DB06294", "enzyme_id": "PGLYCO", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB06294",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # -------------------------------------------------------------------------
     # Additional drugs (second batch)
     # -------------------------------------------------------------------------
     # Lovastatin — CYP3A4
-    {"drug_id": "DB00694", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00694",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Rabeprazole — CYP2C19 (minor)
-    {"drug_id": "DB00213_rabep", "enzyme_id": "CYP2C19", "relation_type": "metabolized_by", "strength": "weak"},
-
+    {
+        "drug_id": "DB00213_rabep",
+        "enzyme_id": "CYP2C19",
+        "relation_type": "metabolized_by",
+        "strength": "weak",
+    },
     # Irbesartan — CYP2C9
-    {"drug_id": "DB00722_irbe", "enzyme_id": "CYP2C9", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00722_irbe",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Pioglitazone — CYP2C8 (no matching enzyme), CYP3A4 secondary
-    {"drug_id": "DB01132", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "weak"},
-
+    {
+        "drug_id": "DB01132",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "weak",
+    },
     # Ranolazine — CYP3A4 primary; mild inhibitor
-    {"drug_id": "DB00612_ranola", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00612_ranola", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00612_ranola", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "weak"},
-
+    {
+        "drug_id": "DB00612_ranola",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00612_ranola",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00612_ranola",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "weak",
+    },
     # Nilotinib — CYP3A4 substrate and strong inhibitor
-    {"drug_id": "DB04896", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB04896", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "strong"},
-
+    {
+        "drug_id": "DB04896",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB04896",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "strong",
+    },
     # Dasatinib — CYP3A4 substrate
-    {"drug_id": "DB05765", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB05765",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Zolmitriptan — CYP1A2
-    {"drug_id": "DB00315", "enzyme_id": "CYP1A2", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00315",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Caffeine — CYP1A2 primary substrate
-    {"drug_id": "DB00316_caffe", "enzyme_id": "CYP1A2", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00316_caffe",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Donepezil — CYP2D6 and CYP3A4
-    {"drug_id": "DB00843", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00843", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00843",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00843",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Celecoxib — CYP2C9 primary
-    {"drug_id": "DB00461", "enzyme_id": "CYP2C9", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00461",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Meloxicam — CYP2C9 and CYP3A4
-    {"drug_id": "DB00814", "enzyme_id": "CYP2C9", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00814", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "weak"},
-
+    {
+        "drug_id": "DB00814",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00814",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "weak",
+    },
     # Ondansetron — CYP1A2, CYP2D6, CYP3A4
-    {"drug_id": "DB00489", "enzyme_id": "CYP1A2", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00489", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00489", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00489",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00489",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00489",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Chlorpromazine — CYP2D6
-    {"drug_id": "DB00477", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00477", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00477",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00477",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     # Citalopram — CYP2C19 and CYP3A4
-    {"drug_id": "DB01104_escit", "enzyme_id": "CYP2C19", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB01104_escit", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB01104_escit", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "weak"},
-
+    {
+        "drug_id": "DB01104_escit",
+        "enzyme_id": "CYP2C19",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB01104_escit",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB01104_escit",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "inhibits",
+        "strength": "weak",
+    },
     # Tamsulosin — CYP3A4 and CYP2D6
-    {"drug_id": "DB00374", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00374", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00374",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00374",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Hydroxychloroquine — CYP2D6 inhibitor; CYP2C8 and CYP3A4 substrate
-    {"drug_id": "DB01611", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "moderate"},
-    {"drug_id": "DB01611", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB01611",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB01611",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Torsemide — CYP2C9
-    {"drug_id": "DB00999_tors", "enzyme_id": "CYP2C9", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00999_tors",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Buspirone — CYP3A4 exclusive
-    {"drug_id": "DB00448_benzo", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00448_benzo",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Modafinil — mild CYP3A4 inducer; CYP2C19 inhibitor
     {"drug_id": "DB00580", "enzyme_id": "CYP3A4", "relation_type": "induces", "strength": "weak"},
     {"drug_id": "DB00580", "enzyme_id": "CYP2C19", "relation_type": "inhibits", "strength": "weak"},
-
     # Estradiol — CYP3A4
-    {"drug_id": "DB01196", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01196",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Finasteride — CYP3A4
-    {"drug_id": "DB00288", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00288",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Sunitinib — CYP3A4
-    {"drug_id": "DB01268", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01268",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Tolterodine — CYP2D6 and CYP3A4
-    {"drug_id": "DB01036", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB01036", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB01036",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB01036",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Clobazam — CYP2C19 and CYP3A4; inhibits CYP2D6
-    {"drug_id": "DB00349", "enzyme_id": "CYP2C19", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00349", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00349", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00349",
+        "enzyme_id": "CYP2C19",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00349",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00349",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     # Bedaquiline — CYP3A4
-    {"drug_id": "DB01051_bed", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01051_bed",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Methadone — CYP3A4 primary, CYP2D6, CYP2B6
-    {"drug_id": "DB00316_metam", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB00316_metam", "enzyme_id": "CYP2D6", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00316_metam", "enzyme_id": "CYP2B6", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB00316_metam",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00316_metam",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00316_metam",
+        "enzyme_id": "CYP2B6",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Phenobarbital — CYP2C9 substrate; potent inducer
-    {"drug_id": "DB00564_pen", "enzyme_id": "CYP2C9", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB00564_pen", "enzyme_id": "CYP3A4", "relation_type": "induces", "strength": "strong"},
-    {"drug_id": "DB00564_pen", "enzyme_id": "CYP2C9", "relation_type": "induces", "strength": "strong"},
-    {"drug_id": "DB00564_pen", "enzyme_id": "CYP2C19", "relation_type": "induces", "strength": "strong"},
-    {"drug_id": "DB00564_pen", "enzyme_id": "CYP1A2", "relation_type": "induces", "strength": "moderate"},
-    {"drug_id": "DB00564_pen", "enzyme_id": "CYP2B6", "relation_type": "induces", "strength": "strong"},
-
+    {
+        "drug_id": "DB00564_pen",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00564_pen",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "induces",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00564_pen",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "induces",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00564_pen",
+        "enzyme_id": "CYP2C19",
+        "relation_type": "induces",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB00564_pen",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "induces",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB00564_pen",
+        "enzyme_id": "CYP2B6",
+        "relation_type": "induces",
+        "strength": "strong",
+    },
     # Hydromorphone — UGT-metabolized
-    {"drug_id": "DB00295_hydro", "enzyme_id": "UGTA1", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00295_hydro",
+        "enzyme_id": "UGTA1",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Betrixaban — P-gp substrate
-    {"drug_id": "DB00682_apix2", "enzyme_id": "PGLYCO", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00682_apix2",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Venetoclax — CYP3A4 and P-gp
-    {"drug_id": "DB09102", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-    {"drug_id": "DB09102", "enzyme_id": "PGLYCO", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB09102",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "DB09102",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Ibrutinib — CYP3A4
-    {"drug_id": "DB09141", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB09141",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Olaparib — CYP3A4
-    {"drug_id": "DB01048_olapar", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01048_olapar",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Methylprednisolone — CYP3A4
-    {"drug_id": "DB00616", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB00616",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Budesonide — CYP3A4
-    {"drug_id": "DB01234_budes", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "strong"},
-
+    {
+        "drug_id": "DB01234_budes",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Clindamycin — CYP3A4
-    {"drug_id": "DB01190", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-
+    {
+        "drug_id": "DB01190",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
     # Montelukast — CYP3A4 and CYP2C9 (note: CYP2C8 is primary but not in our enzyme set)
-    {"drug_id": "DB01048_mont", "enzyme_id": "CYP3A4", "relation_type": "metabolized_by", "strength": "moderate"},
-    {"drug_id": "DB01048_mont", "enzyme_id": "CYP2C9", "relation_type": "metabolized_by", "strength": "weak"},
+    {
+        "drug_id": "DB01048_mont",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "metabolized_by",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "DB01048_mont",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "metabolized_by",
+        "strength": "weak",
+    },
 ]

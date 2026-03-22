@@ -93,6 +93,7 @@ class AdverseEvent(BaseModel):
 
 class GeneticGuideline(BaseModel):
     """CPIC pharmacogenomics guideline for drug-gene pair."""
+
     model_config = ConfigDict(from_attributes=True)
 
     drug_id: str

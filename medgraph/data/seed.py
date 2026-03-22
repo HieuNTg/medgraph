@@ -105,7 +105,9 @@ class DataSeeder:
 
             task = progress.add_task("Seeding pharmacogenomics guidelines...", total=None)
             self._seed_pharmacogenomics()
-            progress.update(task, description="Pharmacogenomics guidelines seeded", completed=1, total=1)
+            progress.update(
+                task, description="Pharmacogenomics guidelines seeded", completed=1, total=1
+            )
 
             # Step 3: DrugBank data (if available)
             parser = DrugBankParser(self.drugbank_dir)
@@ -162,6 +164,7 @@ class DataSeeder:
     def _seed_expanded_drugs(self) -> None:
         try:
             from medgraph.data.seed_drugs_expanded import DRUGS_EXPANDED
+
             for d in DRUGS_EXPANDED:
                 self.store.upsert_drug(Drug(**d))
         except ImportError:
@@ -173,6 +176,7 @@ class DataSeeder:
                 INTERACTIONS_EXPANDED,
                 DRUG_ENZYME_RELATIONS_EXPANDED,
             )
+
             for i in INTERACTIONS_EXPANDED:
                 self.store.upsert_interaction(Interaction(**i))
             for r in DRUG_ENZYME_RELATIONS_EXPANDED:
@@ -184,6 +188,7 @@ class DataSeeder:
         try:
             from medgraph.data.seed_pharmacogenomics import GENETIC_GUIDELINES
             from medgraph.graph.models import GeneticGuideline
+
             for g in GENETIC_GUIDELINES:
                 self.store.upsert_genetic_guideline(GeneticGuideline(**g))
         except ImportError:
