@@ -1,6 +1,6 @@
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, RotateCcw, Network, FileDown, Loader2 } from "lucide-react";
+import { ArrowLeft, RotateCcw, Network, FileDown, Loader2, Dna } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RiskSummary } from "@/components/risk-summary";
 import { InteractionCard } from "@/components/interaction-card";
@@ -24,6 +24,7 @@ function sortBySeverity(interactions: InteractionResult[]): InteractionResult[] 
 
 interface ResultsState {
   result: CheckResponse;
+  metabolizerPhenotypes?: Record<string, string>;
 }
 
 export function ResultsPage() {
@@ -56,7 +57,7 @@ export function ResultsPage() {
 
   if (!state?.result) return null;
 
-  const { result } = state;
+  const { result, metabolizerPhenotypes } = state;
 
   const handleExportPdf = async () => {
     setExporting(true);
@@ -153,6 +154,24 @@ export function ResultsPage() {
           ))}
         </div>
       </div>
+
+      {/* Pharmacogenomics context */}
+      {metabolizerPhenotypes && Object.keys(metabolizerPhenotypes).length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+          <Dna className="h-4 w-4 shrink-0 text-[var(--primary)]" />
+          <span className="text-xs font-medium text-[var(--muted-foreground)]">
+            Pharmacogenomics applied:
+          </span>
+          {Object.entries(metabolizerPhenotypes).map(([gene, phenotype]) => (
+            <span
+              key={gene}
+              className="rounded-full border border-[var(--border)] bg-[var(--secondary)] px-2.5 py-0.5 text-xs text-[var(--foreground)]"
+            >
+              {gene}: {phenotype}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Interaction cards */}
       {sorted.length > 0 ? (

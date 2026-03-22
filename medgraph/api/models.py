@@ -11,6 +11,7 @@ from pydantic import BaseModel
 class CheckRequest(BaseModel):
     drugs: list[str]
     include_evidence: bool = True
+    metabolizer_phenotypes: Optional[dict[str, str]] = None
 
 
 class EnzymeRelationResponse(BaseModel):

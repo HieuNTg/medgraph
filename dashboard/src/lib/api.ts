@@ -18,10 +18,16 @@ export function searchDrugs(query: string): Promise<SearchResult[]> {
   return apiFetch(`/api/drugs/search?q=${encodeURIComponent(query)}`);
 }
 
-export function checkInteractions(drugs: string[]): Promise<CheckResponse> {
+export function checkInteractions(
+  drugs: string[],
+  metabolizerPhenotypes?: Record<string, string>
+): Promise<CheckResponse> {
   return apiFetch("/api/check", {
     method: "POST",
-    body: JSON.stringify({ drugs }),
+    body: JSON.stringify({
+      drugs,
+      metabolizer_phenotypes: metabolizerPhenotypes ?? null,
+    }),
   });
 }
 

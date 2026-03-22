@@ -523,6 +523,42 @@ class TestPerformance:
 
 
 # ---------------------------------------------------------------------------
+# Pharmacogenomics tests
+# ---------------------------------------------------------------------------
+
+
+class TestPharmacogenomics:
+    """Test pharmacogenomics scoring adjustments."""
+
+    def test_pgx_multiplier_increases_score(self, seeded_store: GraphStore, graph) -> None:
+        """CYP2D6 poor metabolizer should increase score for affected drugs."""
+        analyzer = CascadeAnalyzer()
+        # Fluoxetine + Codeine — both CYP2D6 dependent
+        report_normal = analyzer.analyze(["DB00472", "DB00318"], graph, seeded_store)
+
+        # Re-score with CYP2D6 poor metabolizer
+        for result in report_normal.interactions:
+            score_normal = result.risk_score
+            score_pgx = analyzer.scorer.score_interaction(
+                result, seeded_store, metabolizer_phenotypes={"CYP2D6": "poor"}
+            )
+            # PGX score should be >= normal score (multiplier >= 1.0)
+            assert score_pgx >= score_normal
+
+    def test_no_pgx_phenotype_no_change(self, seeded_store: GraphStore, graph) -> None:
+        """Without metabolizer info, score should be unchanged."""
+        analyzer = CascadeAnalyzer()
+        report = analyzer.analyze(["DB00682", "DB00945"], graph, seeded_store)
+        for result in report.interactions:
+            score_without = result.risk_score
+            score_with = analyzer.scorer.score_interaction(
+                result, seeded_store, metabolizer_phenotypes={"CYP2D6": "normal"}
+            )
+            # Normal metabolizer should not change score (multiplier = 1.0, default)
+            assert score_with == score_without
+
+
+# ---------------------------------------------------------------------------
 # Report structure tests
 # ---------------------------------------------------------------------------
 

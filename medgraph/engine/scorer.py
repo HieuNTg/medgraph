@@ -60,6 +60,7 @@ class RiskScorer:
         self,
         result: DrugInteractionResult,
         store: Optional[GraphStore] = None,
+        metabolizer_phenotypes: Optional[dict[str, str]] = None,
     ) -> float:
         """
         Compute risk score for a drug pair interaction result.
@@ -67,6 +68,8 @@ class RiskScorer:
         Args:
             result: DrugInteractionResult with direct interaction and cascade paths
             store: Optional GraphStore for additional evidence lookup
+            metabolizer_phenotypes: Optional dict mapping gene ID to phenotype,
+                e.g. {"CYP2D6": "poor", "CYP2C19": "normal"}
 
         Returns:
             Float score in range [0, 100]
@@ -95,6 +98,19 @@ class RiskScorer:
 
         # Final score
         final = base_score + (cascade_bonus * enzyme_strength) + evidence_modifier
+
+        # Pharmacogenomics adjustment
+        pgx_multiplier = 1.0
+        if metabolizer_phenotypes and store:
+            for gene_id, phenotype in metabolizer_phenotypes.items():
+                # Check if either drug has a guideline for this gene+phenotype
+                for drug in [result.drug_a, result.drug_b]:
+                    guidelines = store.get_genetic_guidelines(drug.id, gene_id)
+                    for gl in guidelines:
+                        if gl.phenotype == phenotype:
+                            pgx_multiplier = max(pgx_multiplier, gl.severity_multiplier)
+
+        final = final * pgx_multiplier
         return min(100.0, final)
 
     def score_report(self, report: InteractionReport) -> float:

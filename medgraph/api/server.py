@@ -280,6 +280,16 @@ def create_app() -> FastAPI:
         # Run analysis
         report = analyzer.analyze(drug_ids, graph, store)
 
+        # Apply pharmacogenomics adjustments if provided
+        if request.metabolizer_phenotypes:
+            for result in report.interactions:
+                result.risk_score = analyzer.scorer.score_interaction(
+                    result, store, metabolizer_phenotypes=request.metabolizer_phenotypes
+                )
+                result.severity = analyzer.scorer.classify_severity(result.risk_score)
+            report.overall_score = analyzer.scorer.score_report(report)
+            report.overall_risk = analyzer.scorer.classify_severity(report.overall_score)
+
         # Build enzyme name cache (avoid repeated full enzyme lookups)
         all_enzymes = {e.id: e for e in store.get_all_enzymes()}
 

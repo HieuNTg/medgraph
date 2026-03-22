@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Shield, AlertCircle } from "lucide-react";
 import { DrugInput } from "@/components/drug-input";
+import { MetabolizerSelector } from "@/components/metabolizer-selector";
 import { Progress } from "@/components/ui/progress";
 import { checkInteractions } from "@/lib/api";
 
@@ -20,6 +21,7 @@ export function CheckerPage() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
+  const [metabolizerPhenotypes, setMetabolizerPhenotypes] = useState<Record<string, string>>({});
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -42,11 +44,24 @@ export function CheckerPage() {
     }, 700);
 
     try {
-      const result = await checkInteractions(drugNames);
+      const result = await checkInteractions(
+        drugNames,
+        Object.keys(metabolizerPhenotypes).length > 0
+          ? metabolizerPhenotypes
+          : undefined
+      );
       clearInterval(intervalRef.current!);
       setProgress(100);
       setTimeout(() => {
-        navigate("/results", { state: { result } });
+        navigate("/results", {
+          state: {
+            result,
+            metabolizerPhenotypes:
+              Object.keys(metabolizerPhenotypes).length > 0
+                ? metabolizerPhenotypes
+                : undefined,
+          },
+        });
       }, 300);
     } catch (err) {
       clearInterval(intervalRef.current!);
@@ -79,6 +94,11 @@ export function CheckerPage() {
       {/* Input */}
       <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 space-y-6">
         <DrugInput onSubmit={handleSubmit} loading={loading} />
+        <MetabolizerSelector
+          value={metabolizerPhenotypes}
+          onChange={setMetabolizerPhenotypes}
+          disabled={loading}
+        />
       </div>
 
       {/* Loading state */}

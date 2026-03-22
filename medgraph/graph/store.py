@@ -17,6 +17,7 @@ from medgraph.graph.models import (
     Drug,
     DrugEnzymeRelation,
     Enzyme,
+    GeneticGuideline,
     Interaction,
 )
 
@@ -104,6 +105,15 @@ class GraphStore:
                     count       INTEGER NOT NULL DEFAULT 0,
                     seriousness TEXT NOT NULL DEFAULT 'unknown',
                     source_url  TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS genetic_guidelines (
+                    drug_id              TEXT NOT NULL,
+                    gene_id              TEXT NOT NULL,
+                    phenotype            TEXT NOT NULL,
+                    recommendation       TEXT NOT NULL DEFAULT '',
+                    severity_multiplier  REAL NOT NULL DEFAULT 1.0,
+                    PRIMARY KEY (drug_id, gene_id, phenotype)
                 );
 
                 -- Indexes for performance
@@ -357,6 +367,33 @@ class GraphStore:
                     )
                 )
         return results
+
+    def upsert_genetic_guideline(self, g: GeneticGuideline) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO genetic_guidelines (drug_id, gene_id, phenotype, recommendation, severity_multiplier)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT(drug_id, gene_id, phenotype) DO UPDATE SET
+                       recommendation=excluded.recommendation,
+                       severity_multiplier=excluded.severity_multiplier""",
+                (g.drug_id, g.gene_id, g.phenotype, g.recommendation, g.severity_multiplier),
+            )
+
+    def get_genetic_guidelines(self, drug_id: str, gene_id: str) -> list[GeneticGuideline]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM genetic_guidelines WHERE drug_id = ? AND gene_id = ?",
+                (drug_id, gene_id),
+            ).fetchall()
+        return [GeneticGuideline(**dict(r)) for r in rows]
+
+    def get_guidelines_for_drug(self, drug_id: str) -> list[GeneticGuideline]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM genetic_guidelines WHERE drug_id = ?",
+                (drug_id,),
+            ).fetchall()
+        return [GeneticGuideline(**dict(r)) for r in rows]
 
     # -------------------------------------------------------------------------
     # Stats

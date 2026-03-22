@@ -89,3 +89,14 @@ class AdverseEvent(BaseModel):
     count: int = 0  # FAERS report count
     seriousness: str = "unknown"  # "serious" | "non-serious" | "fatal" | "unknown"
     source_url: Optional[str] = None
+
+
+class GeneticGuideline(BaseModel):
+    """CPIC pharmacogenomics guideline for drug-gene pair."""
+    model_config = ConfigDict(from_attributes=True)
+
+    drug_id: str
+    gene_id: str  # e.g. "CYP2D6", "CYP2C19"
+    phenotype: str  # "poor" | "intermediate" | "normal" | "ultrarapid"
+    recommendation: str  # Clinical recommendation text
+    severity_multiplier: float = 1.0  # Multiplier for risk score adjustment
