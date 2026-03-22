@@ -256,6 +256,27 @@ def enrich(db: str, agent: str, max_items: int) -> None:
     )
 
 
+@cli.command()
+@click.option("--db", default="data/medgraph.db", help="Database path", show_default=True)
+def expand(db: str) -> None:
+    """Expand database with additional drug data (Flockhart CYP450 + DDInter)."""
+    from medgraph.data.seed import DataSeeder
+    from medgraph.graph.store import GraphStore
+
+    db_path = Path(db)
+    store = GraphStore(db_path)
+    seeder = DataSeeder(store=store, db_path=db_path)
+    seeder._seed_expanded_drugs()
+    seeder._seed_expanded_interactions()
+    counts = seeder.store.get_counts()
+    console.print("[bold green]Database expanded![/]")
+    console.print(
+        f"  Drugs: [cyan]{counts['drugs']}[/]  "
+        f"Interactions: [cyan]{counts['interactions']}[/]  "
+        f"Enzyme relations: [cyan]{counts['drug_enzyme_relations']}[/]"
+    )
+
+
 def main() -> None:
     cli()
 

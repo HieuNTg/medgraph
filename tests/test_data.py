@@ -249,6 +249,54 @@ class TestSeedData:
 
 
 # ---------------------------------------------------------------------------
+# Expanded data tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def expanded_store(tmp_path: Path) -> GraphStore:
+    """Provide a store seeded with built-in + expanded data."""
+    from medgraph.data.seed import DataSeeder
+
+    store = GraphStore(tmp_path / "expanded.db")
+    seeder = DataSeeder(
+        store=store,
+        db_path=tmp_path / "expanded.db",
+        skip_openfda=True,
+    )
+    seeder.run()
+    return store
+
+
+class TestExpandedData:
+    def test_expanded_drugs_count(self, expanded_store: GraphStore) -> None:
+        pytest.importorskip("medgraph.data.seed_drugs_expanded")
+        counts = expanded_store.get_counts()
+        assert counts["drugs"] > 200, f"Expected >200 drugs after expansion, got {counts['drugs']}"
+
+    def test_food_items_searchable(self, expanded_store: GraphStore) -> None:
+        pytest.importorskip("medgraph.data.seed_drugs_expanded")
+        grapefruit = expanded_store.search_drugs("grapefruit", limit=5)
+        assert len(grapefruit) >= 1, "Grapefruit should be searchable after expansion"
+        stjohn = expanded_store.search_drugs("St. John", limit=5)
+        assert len(stjohn) >= 1, "St. John's Wort should be searchable after expansion"
+
+    def test_expanded_interactions_count(self, expanded_store: GraphStore) -> None:
+        pytest.importorskip("medgraph.data.seed_interactions_expanded")
+        counts = expanded_store.get_counts()
+        assert counts["interactions"] >= 100, (
+            f"Expected >=100 interactions after expansion, got {counts['interactions']}"
+        )
+
+    def test_expanded_enzyme_relations_count(self, expanded_store: GraphStore) -> None:
+        pytest.importorskip("medgraph.data.seed_interactions_expanded")
+        counts = expanded_store.get_counts()
+        assert counts["drug_enzyme_relations"] > 200, (
+            f"Expected >200 enzyme relations after expansion, got {counts['drug_enzyme_relations']}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # DrugBank parser tests (with mock data)
 # ---------------------------------------------------------------------------
 

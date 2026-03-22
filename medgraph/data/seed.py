@@ -94,7 +94,16 @@ class DataSeeder:
             self._seed_builtin_adverse_events()
             progress.update(task, description="Adverse events seeded", completed=1, total=1)
 
-            # Step 2: DrugBank data (if available)
+            # Step 2: Expanded drug data (Flockhart CYP450 + DDInter)
+            task = progress.add_task("Seeding expanded drugs...", total=None)
+            self._seed_expanded_drugs()
+            progress.update(task, description="Expanded drugs seeded", completed=1, total=1)
+
+            task = progress.add_task("Seeding expanded interactions...", total=None)
+            self._seed_expanded_interactions()
+            progress.update(task, description="Expanded interactions seeded", completed=1, total=1)
+
+            # Step 3: DrugBank data (if available)
             parser = DrugBankParser(self.drugbank_dir)
             if parser.is_available():
                 task = progress.add_task("Loading DrugBank data...", total=None)
@@ -105,7 +114,7 @@ class DataSeeder:
                     "Place files in data/drugbank/ for 2700+ drugs.[/]"
                 )
 
-            # Step 3: OpenFDA enrichment (optional)
+            # Step 4: OpenFDA enrichment (optional)
             if not self.skip_openfda:
                 task = progress.add_task("Enriching with OpenFDA...", total=None)
                 self._enrich_openfda()
@@ -145,6 +154,27 @@ class DataSeeder:
     def _seed_builtin_adverse_events(self) -> None:
         for e in sd.ADVERSE_EVENTS:
             self.store.upsert_adverse_event(AdverseEvent(**e))
+
+    def _seed_expanded_drugs(self) -> None:
+        try:
+            from medgraph.data.seed_drugs_expanded import DRUGS_EXPANDED
+            for d in DRUGS_EXPANDED:
+                self.store.upsert_drug(Drug(**d))
+        except ImportError:
+            logger.debug("seed_drugs_expanded not available — skipping")
+
+    def _seed_expanded_interactions(self) -> None:
+        try:
+            from medgraph.data.seed_interactions_expanded import (
+                INTERACTIONS_EXPANDED,
+                DRUG_ENZYME_RELATIONS_EXPANDED,
+            )
+            for i in INTERACTIONS_EXPANDED:
+                self.store.upsert_interaction(Interaction(**i))
+            for r in DRUG_ENZYME_RELATIONS_EXPANDED:
+                self.store.upsert_drug_enzyme_relation(DrugEnzymeRelation(**r))
+        except ImportError:
+            logger.debug("seed_interactions_expanded not available — skipping")
 
     def _seed_drugbank(self, parser: DrugBankParser, progress, task) -> None:
         """Seed from DrugBank CSV files."""
