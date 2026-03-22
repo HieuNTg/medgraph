@@ -25,6 +25,7 @@ from typing import AsyncGenerator, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 
 from medgraph import __version__
 from medgraph.api.models import (
@@ -37,6 +38,7 @@ from medgraph.api.models import (
     CascadeStepResponse,
     HealthResponse,
     InteractionResponse,
+    PDFReportRequest,
     SearchResult,
     StatsResponse,
 )
@@ -366,6 +368,23 @@ def create_app() -> FastAPI:
             interaction_count=len(report.interactions),
             timestamp=datetime.now(timezone.utc).isoformat(),
             disclaimer=DISCLAIMER,
+        )
+
+    @app.post("/api/report/pdf", tags=["reports"])
+    async def generate_pdf_report(request: PDFReportRequest) -> Response:
+        """Generate a PDF report from check results."""
+        from medgraph.reports.pdf_generator import generate_report_pdf
+
+        pdf_bytes = generate_report_pdf(
+            check_result=request.check_result,
+            graph_png_b64=request.graph_png_b64,
+        )
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "attachment; filename=medgraph-report.pdf",
+            },
         )
 
     return app

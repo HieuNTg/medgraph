@@ -36,3 +36,21 @@ export function getStats(): Promise<{
 }> {
   return apiFetch("/api/stats");
 }
+
+export async function exportPdfReport(
+  checkResult: CheckResponse,
+  graphPngB64?: string
+): Promise<Blob> {
+  const res = await fetch("/api/report/pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      check_result: checkResult,
+      graph_png_b64: graphPngB64 ?? null,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`PDF export failed: ${res.status}`);
+  }
+  return res.blob();
+}

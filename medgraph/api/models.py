@@ -87,3 +87,8 @@ class HealthResponse(BaseModel):
     status: str
     db_size: int
     graph_nodes: int
+
+
+class PDFReportRequest(BaseModel):
+    check_result: dict
+    graph_png_b64: Optional[str] = None

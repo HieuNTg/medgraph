@@ -1,11 +1,12 @@
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, RotateCcw, Network } from "lucide-react";
+import { ArrowLeft, RotateCcw, Network, FileDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RiskSummary } from "@/components/risk-summary";
 import { InteractionCard } from "@/components/interaction-card";
 import { InteractionGraph } from "@/components/interaction-graph";
 import type { CheckResponse, InteractionResult } from "@/lib/types";
+import { exportPdfReport } from "@/lib/api";
 
 const SEVERITY_ORDER: Record<string, number> = {
   critical: 0,
@@ -32,6 +33,7 @@ export function ResultsPage() {
   const [showGraph, setShowGraph] = useState(true);
   const graphContainerRef = useRef<HTMLDivElement>(null);
   const [graphWidth, setGraphWidth] = useState(700);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!state?.result) {
@@ -55,6 +57,32 @@ export function ResultsPage() {
   if (!state?.result) return null;
 
   const { result } = state;
+
+  const handleExportPdf = async () => {
+    setExporting(true);
+    try {
+      // Capture graph as PNG if visible
+      let graphPng: string | undefined;
+      const canvas = graphContainerRef.current?.querySelector("canvas");
+      if (canvas && showGraph) {
+        graphPng = canvas.toDataURL("image/png").replace("data:image/png;base64,", "");
+      }
+
+      const blob = await exportPdfReport(result, graphPng);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `medgraph-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    } finally {
+      setExporting(false);
+    }
+  };
   const sorted = sortBySeverity(result.interactions);
 
   // Check if graph has meaningful data to show
@@ -156,6 +184,24 @@ export function ResultsPage() {
             <RotateCcw className="h-4 w-4" />
             Check Another Combination
           </Link>
+        </Button>
+        <Button
+          variant="default"
+          onClick={handleExportPdf}
+          disabled={exporting}
+          className="flex items-center gap-2"
+        >
+          {exporting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Generating PDF...
+            </>
+          ) : (
+            <>
+              <FileDown className="h-4 w-4" />
+              Export PDF Report
+            </>
+          )}
         </Button>
       </div>
     </div>
