@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 
 from medgraph.agents.base import AgentResult, BaseAgent
-from medgraph.graph.models import DrugEnzymeRelation, Interaction
+from medgraph.graph.models import Drug, DrugEnzymeRelation, Interaction
 from medgraph.graph.store import GraphStore
 
 logger = logging.getLogger(__name__)
@@ -125,11 +125,15 @@ class SeverityAgent(BaseAgent):
         for rel in all_relations:
             drug_relations.setdefault(rel.drug_id, []).append(rel)
 
+        # Pre-load all drugs to avoid N+1 queries in _classify()
+        all_drugs = self.store.get_all_drugs()
+        drug_map: dict[str, Drug] = {d.id: d for d in all_drugs}
+
         result.records_processed = len(interactions)
 
         for interaction in interactions:
             try:
-                new_severity = self._classify(interaction, drug_relations)
+                new_severity = self._classify(interaction, drug_relations, drug_map)
                 current_rank = _SEVERITY_RANK.get(interaction.severity, 0)
                 new_rank = _SEVERITY_RANK.get(new_severity, 0)
 
@@ -153,6 +157,7 @@ class SeverityAgent(BaseAgent):
         self,
         interaction: Interaction,
         drug_relations: dict[str, list[DrugEnzymeRelation]],
+        drug_map: dict[str, Drug],
     ) -> str:
         """
         Compute severity for an interaction using multi-factor analysis.
@@ -169,8 +174,8 @@ class SeverityAgent(BaseAgent):
             scores.append(self._score_description(interaction.mechanism))
 
         # Factor 3: Narrow therapeutic index check
-        drug_a = self.store.get_drug_by_id(interaction.drug_a_id)
-        drug_b = self.store.get_drug_by_id(interaction.drug_b_id)
+        drug_a = drug_map.get(interaction.drug_a_id)
+        drug_b = drug_map.get(interaction.drug_b_id)
         if drug_a and drug_a.name.lower() in _NARROW_THERAPEUTIC_INDEX:
             scores.append(3)  # major baseline for NTI drugs
         if drug_b and drug_b.name.lower() in _NARROW_THERAPEUTIC_INDEX:
@@ -280,6 +285,6 @@ class SeverityAgent(BaseAgent):
         if len(shared) >= 3:
             max_score = max(max_score, 3)  # major if 3+ shared enzymes
         elif len(shared) >= 2:
-            max_score = max(max_score, max_score)  # keep current
+            max_score = max(max_score, 2)  # escalate to moderate for 2+ shared enzymes
 
         return max_score

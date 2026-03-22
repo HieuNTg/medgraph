@@ -5,17 +5,12 @@ FastAPI request/response models for MEDGRAPH API.
 from __future__ import annotations
 
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class CheckRequest(BaseModel):
     drugs: list[str]
     include_evidence: bool = True
-
-
-class DrugSearchQuery(BaseModel):
-    q: str
-    limit: int = Field(default=10, le=50)
 
 
 class EnzymeRelationResponse(BaseModel):

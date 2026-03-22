@@ -16,9 +16,10 @@ Endpoints:
 from __future__ import annotations
 
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncGenerator, Optional
 
@@ -53,15 +54,13 @@ DISCLAIMER = (
     "Always consult a qualified healthcare professional."
 )
 
-# Stats cache: (result, expiry_timestamp)
-_stats_cache: tuple[Optional[StatsResponse], float] = (None, 0.0)
 _STATS_TTL = 3600.0  # 1 hour
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize graph and store on startup; clean up on shutdown."""
-    db_path = Path("data/medgraph.db")
+    db_path = Path(os.environ.get("MEDGRAPH_DB_PATH", "data/medgraph.db"))
     if not db_path.exists():
         logger.warning(
             "Database not found at data/medgraph.db. Run 'python -m medgraph.cli seed' first."
@@ -78,6 +77,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.graph = graph
     app.state.analyzer = analyzer
     app.state.searcher = searcher
+    app.state.stats_cache = (None, 0.0)
 
     counts = store.get_counts()
     logger.info(
@@ -149,8 +149,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/stats", response_model=StatsResponse, tags=["system"])
     async def stats() -> StatsResponse:
-        global _stats_cache
-        cached_result, expiry = _stats_cache
+        cached_result, expiry = app.state.stats_cache
         now = time.monotonic()
         if cached_result is not None and now < expiry:
             return cached_result
@@ -163,7 +162,7 @@ def create_app() -> FastAPI:
             enzyme_count=counts.get("enzymes", 0),
             adverse_event_count=counts.get("adverse_events", 0),
         )
-        _stats_cache = (result, now + _STATS_TTL)
+        app.state.stats_cache = (result, now + _STATS_TTL)
         return result
 
     @app.get("/api/drugs/search", response_model=list[SearchResult], tags=["drugs"])
@@ -198,9 +197,7 @@ def create_app() -> FastAPI:
     )
     async def get_interaction_evidence(interaction_id: str) -> list[EvidenceResponse]:
         store: GraphStore = app.state.store
-        # Find the interaction to get drug ids
-        all_interactions = store.get_all_interactions()
-        interaction = next((i for i in all_interactions if i.id == interaction_id), None)
+        interaction = store.get_interaction_by_id(interaction_id)
         if not interaction:
             raise HTTPException(status_code=404, detail=f"Interaction not found: {interaction_id}")
 
@@ -267,8 +264,14 @@ def create_app() -> FastAPI:
                 # broad search for suggestions
                 broad = searcher.search(name[:3], limit=5) if len(name) >= 3 else []
                 suggestions[name] = [d.name for d in broad]
-            detail = f"Drugs not found: {unresolved}. Suggestions: {suggestions}"
-            raise HTTPException(status_code=400, detail=detail)
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Some drugs were not found",
+                    "unresolved": unresolved,
+                    "suggestions": suggestions,
+                },
+            )
 
         drug_ids = [d.id for d in found_drugs]
 
@@ -361,7 +364,7 @@ def create_app() -> FastAPI:
             overall_score=report.overall_score,
             drug_count=len(report.drugs),
             interaction_count=len(report.interactions),
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             disclaimer=DISCLAIMER,
         )
 

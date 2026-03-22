@@ -25,19 +25,6 @@ logger = logging.getLogger(__name__)
 # Max BFS depth to prevent combinatorial explosion
 DEFAULT_MAX_DEPTH = 3
 
-# Effect descriptions for different relation combinations
-_EFFECT_TEMPLATES: dict[tuple[str, str], str] = {
-    # (relation_type, enzyme_role_for_other_drug) -> effect on other drug
-    ("inhibits", "metabolized_by"): "reduced metabolism → increased drug levels → toxicity risk",
-    ("inhibits", "induces"): "reduced enzyme induction capacity",
-    (
-        "induces",
-        "metabolized_by",
-    ): "accelerated metabolism → reduced drug levels → decreased efficacy",
-    ("induces", "inhibits"): "reduced inhibitory effect on enzyme",
-    ("metabolized_by", "metabolized_by"): "competition for enzyme → variable levels",
-}
-
 _SEVERITY_ORDER = {"critical": 4, "major": 3, "moderate": 2, "minor": 1, "none": 0}
 
 

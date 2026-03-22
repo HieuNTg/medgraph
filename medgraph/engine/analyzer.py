@@ -233,63 +233,6 @@ class CascadeAnalyzer:
             evidence=evidence,
         )
 
-    def _analyze_pair(
-        self,
-        drug_a: Drug,
-        drug_b: Drug,
-        all_cascade_paths: list[CascadePath],
-        store: GraphStore,
-    ) -> DrugInteractionResult:
-        """Analyze a single drug pair: direct interaction + relevant cascades."""
-        # 1. Direct interaction lookup
-        direct = store.get_direct_interaction(drug_a.id, drug_b.id)
-
-        # 2. Filter cascade paths relevant to this pair
-        pair_cascades = [
-            p
-            for p in all_cascade_paths
-            if (
-                p.drug_a_name.lower() == drug_a.name.lower()
-                and p.drug_b_name.lower() == drug_b.name.lower()
-            )
-            or (
-                p.drug_a_name.lower() == drug_b.name.lower()
-                and p.drug_b_name.lower() == drug_a.name.lower()
-            )
-        ]
-
-        # 3. Build evidence items
-        evidence: list[EvidenceItem] = []
-        if direct:
-            evidence.append(
-                EvidenceItem(
-                    source=direct.source,
-                    description=direct.description,
-                    evidence_count=direct.evidence_count,
-                )
-            )
-
-        # Check adverse events
-        adverse = store.get_adverse_events([drug_a.id, drug_b.id])
-        for ae in adverse:
-            if drug_a.id in ae.drug_ids and drug_b.id in ae.drug_ids:
-                evidence.append(
-                    EvidenceItem(
-                        source="faers",
-                        description=f"FAERS: {ae.reaction} ({ae.seriousness})",
-                        evidence_count=ae.count,
-                        url=ae.source_url,
-                    )
-                )
-
-        return DrugInteractionResult(
-            drug_a=drug_a,
-            drug_b=drug_b,
-            direct_interaction=direct,
-            cascade_paths=pair_cascades,
-            evidence=evidence,
-        )
-
     def _empty_report(self, drugs: list[Drug]) -> InteractionReport:
         """Return an empty report for invalid inputs."""
         return InteractionReport(

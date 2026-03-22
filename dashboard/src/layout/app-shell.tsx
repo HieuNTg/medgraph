@@ -7,6 +7,8 @@ import { MedicalDisclaimer } from "@/components/medical-disclaimer";
 function ThemeToggle() {
   const [dark, setDark] = useState(() => {
     if (typeof window === "undefined") return false;
+    const stored = localStorage.getItem("medgraph-theme");
+    if (stored) return stored === "dark";
     return document.documentElement.classList.contains("dark");
   });
 
@@ -19,6 +21,7 @@ function ThemeToggle() {
       root.classList.remove("dark");
       root.classList.add("light");
     }
+    localStorage.setItem("medgraph-theme", dark ? "dark" : "light");
   }, [dark]);
 
   return (

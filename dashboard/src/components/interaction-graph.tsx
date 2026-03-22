@@ -6,7 +6,7 @@
  * Users can hover nodes for details and drag to rearrange.
  */
 
-import { useMemo, useRef, useCallback, useEffect } from "react";
+import { useMemo, useRef, useCallback, useEffect, useState } from "react";
 import ForceGraph2D, {
   type ForceGraphMethods,
   type NodeObject,
@@ -156,7 +156,20 @@ export function InteractionGraph({
   height = 450,
 }: InteractionGraphProps) {
   const graphRef = useRef<ForceGraphMethods<GraphNode, GraphLink>>(undefined);
-  const isDark = document.documentElement.classList.contains("dark");
+  const [isDark, setIsDark] = useState(() =>
+    document.documentElement.classList.contains("dark")
+  );
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   const graphData = useMemo(() => buildGraphData(data), [data]);
 

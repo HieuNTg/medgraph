@@ -41,10 +41,11 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
     (r) => !selectedDrugs.some((s) => s.id === r.id)
   );
 
+  const shouldBeOpen = filteredResults.length > 0 && query.trim().length >= 2;
   useEffect(() => {
-    setOpen(filteredResults.length > 0 && query.trim().length >= 2);
+    setOpen(shouldBeOpen);
     setHighlightedIndex(-1);
-  }, [filteredResults.length, query]);
+  }, [shouldBeOpen]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -109,6 +110,7 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
             >
               {drug.name}
               <button
+                type="button"
                 onClick={() => removeDrug(drug.id)}
                 className="ml-1 rounded-full hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
                 aria-label={`Remove ${drug.name}`}

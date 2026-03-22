@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Shield, AlertCircle } from "lucide-react";
 import { DrugInput } from "@/components/drug-input";
@@ -20,29 +20,36 @@ export function CheckerPage() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleSubmit = async (drugIds: string[]) => {
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  const handleSubmit = async (drugNames: string[]) => {
     setError(null);
     setLoading(true);
     setProgress(0);
 
     // Animate progress messages
     let msgIndex = 0;
-    const msgInterval = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       msgIndex = (msgIndex + 1) % LOADING_MESSAGES.length;
       setLoadingMsg(LOADING_MESSAGES[msgIndex]);
       setProgress((p) => Math.min(p + 15, 90));
     }, 700);
 
     try {
-      const result = await checkInteractions(drugIds);
-      clearInterval(msgInterval);
+      const result = await checkInteractions(drugNames);
+      clearInterval(intervalRef.current!);
       setProgress(100);
       setTimeout(() => {
         navigate("/results", { state: { result } });
       }, 300);
     } catch (err) {
-      clearInterval(msgInterval);
+      clearInterval(intervalRef.current!);
       setLoading(false);
       setProgress(0);
       setError(
@@ -76,7 +83,7 @@ export function CheckerPage() {
 
       {/* Loading state */}
       {loading && (
-        <div className="space-y-3">
+        <div className="space-y-3" aria-live="polite">
           <div className="flex items-center gap-3 text-sm text-[var(--muted-foreground)]">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent" />
             {loadingMsg}
@@ -87,7 +94,7 @@ export function CheckerPage() {
 
       {/* Error state */}
       {error && (
-        <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+        <div role="alert" className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="space-y-1">
             <p className="font-semibold text-sm">Analysis Failed</p>

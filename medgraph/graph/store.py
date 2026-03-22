@@ -264,6 +264,24 @@ class GraphStore:
             rows = conn.execute("SELECT * FROM interactions").fetchall()
         return [self._row_to_interaction(r) for r in rows]
 
+    def get_interaction_by_id(self, interaction_id: str) -> Optional[Interaction]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM interactions WHERE id = ?", (interaction_id,)
+            ).fetchone()
+        if not row:
+            return None
+        return Interaction(
+            id=row["id"],
+            drug_a_id=row["drug_a_id"],
+            drug_b_id=row["drug_b_id"],
+            severity=row["severity"],
+            description=row["description"],
+            mechanism=row["mechanism"],
+            source=row["source"],
+            evidence_count=row["evidence_count"],
+        )
+
     def get_all_drug_enzyme_relations(self) -> list[DrugEnzymeRelation]:
         with self._connect() as conn:
             rows = conn.execute("SELECT * FROM drug_enzyme_relations").fetchall()

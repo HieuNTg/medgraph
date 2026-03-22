@@ -92,7 +92,10 @@ class TestCheckEndpoint:
     def test_check_unknown_drug_400(self, client: TestClient) -> None:
         resp = client.post("/api/check", json={"drugs": ["notadrug123xyz", "Aspirin"]})
         assert resp.status_code == 400
-        assert "not found" in resp.json()["detail"].lower()
+        detail = resp.json()["detail"]
+        assert isinstance(detail, dict)
+        assert "unresolved" in detail
+        assert len(detail["unresolved"]) > 0
 
     def test_check_completely_unknown_drug_400(self, client: TestClient) -> None:
         resp = client.post("/api/check", json={"drugs": ["zzzdrug999"]})
