@@ -43,6 +43,7 @@ from medgraph.api.models import (
     InteractionResponse,
     JSONReportRequest,
     PDFReportRequest,
+    PGxAnnotation,
     SearchResult,
     StatsResponse,
 )
@@ -364,6 +365,24 @@ def create_app() -> FastAPI:
                 description = result.direct_interaction.description
                 mechanism = result.direct_interaction.mechanism
 
+            # Build PGx annotations if metabolizer_phenotypes provided
+            pgx_annotations: list[PGxAnnotation] = []
+            if request.metabolizer_phenotypes:
+                for gene_id, phenotype in request.metabolizer_phenotypes.items():
+                    for drug in [result.drug_a, result.drug_b]:
+                        guidelines = store.get_genetic_guidelines(drug.id, gene_id)
+                        for gl in guidelines:
+                            if gl.phenotype == phenotype:
+                                pgx_annotations.append(
+                                    PGxAnnotation(
+                                        gene=gene_id,
+                                        phenotype=phenotype,
+                                        drug_name=drug.name,
+                                        recommendation=gl.recommendation,
+                                        severity_multiplier=gl.severity_multiplier,
+                                    )
+                                )
+
             interactions_response.append(
                 InteractionResponse(
                     drug_a=make_drug_response(result.drug_a),
@@ -374,6 +393,7 @@ def create_app() -> FastAPI:
                     mechanism=mechanism,
                     cascade_paths=cascade_paths_resp,
                     evidence=evidence_resp,
+                    pgx_annotations=pgx_annotations,
                 )
             )
 
@@ -437,6 +457,23 @@ def create_app() -> FastAPI:
                 "Content-Disposition": "attachment; filename=medgraph-report.csv",
             },
         )
+
+    @app.get("/api/pgx/guidelines", tags=["pharmacogenomics"], dependencies=_api_deps)
+    async def get_pgx_guidelines(
+        drug_id: str = Query(..., description="Drug ID (e.g. DB00318)"),
+    ) -> list[dict]:
+        """Get CPIC pharmacogenomics guidelines for a drug."""
+        store: GraphStore = app.state.store
+        guidelines = store.get_guidelines_for_drug(drug_id)
+        return [
+            {
+                "gene": gl.gene_id,
+                "phenotype": gl.phenotype,
+                "recommendation": gl.recommendation,
+                "severity_multiplier": gl.severity_multiplier,
+            }
+            for gl in guidelines
+        ]
 
     return app
 

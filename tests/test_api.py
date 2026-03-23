@@ -299,3 +299,72 @@ class TestCSVReportEndpoint:
 
         rows = list(csv.reader(io.StringIO(resp.text)))
         assert len(rows) >= 2  # header + interactions
+
+
+# ---------------------------------------------------------------------------
+# Pharmacogenomics Endpoints
+# ---------------------------------------------------------------------------
+
+
+class TestPGxAnnotations:
+    def test_check_with_pgx_returns_annotations(self, client: TestClient) -> None:
+        """POST /api/check with metabolizer_phenotypes returns pgx_annotations."""
+        resp = client.post(
+            "/api/check",
+            json={
+                "drugs": ["Codeine", "Fluoxetine"],
+                "metabolizer_phenotypes": {"CYP2D6": "poor"},
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        # At least one interaction should have PGx annotations
+        all_pgx = []
+        for ix in data["interactions"]:
+            all_pgx.extend(ix.get("pgx_annotations", []))
+        assert len(all_pgx) > 0
+        # Verify annotation structure
+        pgx = all_pgx[0]
+        assert "gene" in pgx
+        assert "phenotype" in pgx
+        assert "drug_name" in pgx
+        assert "recommendation" in pgx
+        assert "severity_multiplier" in pgx
+
+    def test_check_without_pgx_no_annotations(self, client: TestClient) -> None:
+        """Without metabolizer_phenotypes, pgx_annotations is empty."""
+        resp = client.post(
+            "/api/check",
+            json={"drugs": ["Warfarin", "Aspirin"]},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        for ix in data["interactions"]:
+            assert ix["pgx_annotations"] == []
+
+
+class TestPGxGuidelinesEndpoint:
+    def test_pgx_guidelines_for_codeine(self, client: TestClient) -> None:
+        """GET /api/pgx/guidelines returns CPIC guidelines for a drug."""
+        # First find Codeine's drug ID
+        search = client.get("/api/drugs/search?q=Codeine")
+        assert search.status_code == 200
+        results = search.json()
+        if not results:
+            pytest.skip("Codeine not in seeded store")
+
+        drug_id = results[0]["id"]
+        resp = client.get(f"/api/pgx/guidelines?drug_id={drug_id}")
+        assert resp.status_code == 200
+        guidelines = resp.json()
+        assert len(guidelines) > 0
+        gl = guidelines[0]
+        assert "gene" in gl
+        assert "phenotype" in gl
+        assert "recommendation" in gl
+        assert "severity_multiplier" in gl
+
+    def test_pgx_guidelines_unknown_drug_empty(self, client: TestClient) -> None:
+        resp = client.get("/api/pgx/guidelines?drug_id=UNKNOWN_XYZ")
+        assert resp.status_code == 200
+        assert resp.json() == []

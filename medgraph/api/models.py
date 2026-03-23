@@ -89,6 +89,14 @@ class EvidenceResponse(BaseModel):
     url: Optional[str]
 
 
+class PGxAnnotation(BaseModel):
+    gene: str
+    phenotype: str
+    drug_name: str
+    recommendation: str
+    severity_multiplier: float
+
+
 class InteractionResponse(BaseModel):
     drug_a: DrugResponse
     drug_b: DrugResponse
@@ -98,6 +106,7 @@ class InteractionResponse(BaseModel):
     mechanism: Optional[str]
     cascade_paths: list[CascadePathResponse]
     evidence: list[EvidenceResponse]
+    pgx_annotations: list[PGxAnnotation] = []
 
 
 class CheckResponse(BaseModel):

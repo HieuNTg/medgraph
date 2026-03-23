@@ -251,3 +251,79 @@ class TestCSVGenerator:
         risk_idx = header.index("Overall Risk")
         for row in rows[1:]:
             assert row[risk_idx] == "major"
+
+    def test_pgx_notes_column_present(self, check_result: dict) -> None:
+        rows = self._parse_csv(generate_report_csv(check_result))
+        header = rows[0]
+        assert "PGx Notes" in header
+
+    def test_pgx_notes_populated(self) -> None:
+        result = {
+            **EMPTY_CHECK_RESULT,
+            "interactions": [
+                {
+                    "drug_a": {"name": "Codeine"},
+                    "drug_b": {"name": "Fluoxetine"},
+                    "severity": "major",
+                    "risk_score": 72.0,
+                    "description": "test",
+                    "mechanism": None,
+                    "cascade_paths": [],
+                    "evidence": [],
+                    "pgx_annotations": [
+                        {
+                            "gene": "CYP2D6",
+                            "phenotype": "poor",
+                            "drug_name": "Codeine",
+                            "recommendation": "Avoid codeine",
+                            "severity_multiplier": 0.5,
+                        }
+                    ],
+                },
+            ],
+        }
+        rows = self._parse_csv(generate_report_csv(result))
+        header = rows[0]
+        pgx_idx = header.index("PGx Notes")
+        assert "CYP2D6 poor" in rows[1][pgx_idx]
+        assert "Avoid codeine" in rows[1][pgx_idx]
+
+
+# ---------------------------------------------------------------------------
+# JSON Generator PGx Tests
+# ---------------------------------------------------------------------------
+
+
+class TestJSONGeneratorPGx:
+    def test_pgx_annotations_included(self) -> None:
+        result = {
+            **SAMPLE_CHECK_RESULT,
+            "interactions": [
+                {
+                    **SAMPLE_CHECK_RESULT["interactions"][0],
+                    "pgx_annotations": [
+                        {
+                            "gene": "CYP2D6",
+                            "phenotype": "poor",
+                            "drug_name": "Fluoxetine",
+                            "recommendation": "Consider dose reduction",
+                            "severity_multiplier": 1.5,
+                        }
+                    ],
+                }
+            ],
+        }
+        parsed = json.loads(generate_report_json(result))
+        ix = parsed["interactions"][0]
+        assert "pgx_annotations" in ix
+        assert len(ix["pgx_annotations"]) == 1
+        pgx = ix["pgx_annotations"][0]
+        assert pgx["gene"] == "CYP2D6"
+        assert pgx["phenotype"] == "poor"
+        assert pgx["severity_multiplier"] == 1.5
+
+    def test_no_pgx_annotations_omitted(self, check_result: dict) -> None:
+        """When no PGx annotations, field should not be present."""
+        parsed = json.loads(generate_report_json(check_result))
+        ix = parsed["interactions"][0]
+        assert "pgx_annotations" not in ix

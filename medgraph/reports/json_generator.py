@@ -64,6 +64,17 @@ def _extract_interactions(interactions: list[dict]) -> list[dict]:
     """Extract interaction data into a clean structure."""
     result = []
     for ix in interactions:
+        pgx = [
+            {
+                "gene": a.get("gene", ""),
+                "phenotype": a.get("phenotype", ""),
+                "drug_name": a.get("drug_name", ""),
+                "recommendation": a.get("recommendation", ""),
+                "severity_multiplier": a.get("severity_multiplier", 1.0),
+            }
+            for a in ix.get("pgx_annotations", [])
+        ]
+
         entry = {
             "drug_a": ix.get("drug_a", {}).get("name", ""),
             "drug_b": ix.get("drug_b", {}).get("name", ""),
@@ -97,5 +108,7 @@ def _extract_interactions(interactions: list[dict]) -> list[dict]:
                 for ev in ix.get("evidence", [])
             ],
         }
+        if pgx:
+            entry["pgx_annotations"] = pgx
         result.append(entry)
     return result

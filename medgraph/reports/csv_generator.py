@@ -33,6 +33,7 @@ def generate_report_csv(check_result: dict) -> str:
             "Cascade Count",
             "Cascade Summary",
             "FAERS Cases",
+            "PGx Notes",
             "Overall Risk",
             "Overall Score",
         ]
@@ -50,6 +51,11 @@ def generate_report_csv(check_result: dict) -> str:
         evidence = ix.get("evidence", [])
         total_cases = sum(e.get("case_count", 0) or 0 for e in evidence)
 
+        pgx_notes = "; ".join(
+            f"{a.get('gene', '')} {a.get('phenotype', '')}: {a.get('recommendation', '')}"
+            for a in ix.get("pgx_annotations", [])
+        )
+
         writer.writerow(
             [
                 ix.get("drug_a", {}).get("name", ""),
@@ -61,6 +67,7 @@ def generate_report_csv(check_result: dict) -> str:
                 len(cascades),
                 cascade_summary,
                 total_cases,
+                pgx_notes,
                 overall_risk,
                 f"{overall_score:.1f}",
             ]
