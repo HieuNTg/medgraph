@@ -4,13 +4,15 @@ FastAPI server for MEDGRAPH.
 Provides REST API for drug interaction analysis.
 Graph and store are loaded once at startup and cached in app state.
 
+All API endpoints are mounted at both /api/v1/ (canonical) and /api/ (backward compat).
+
 Endpoints:
-    GET  /health                                    — Health check with DB stats
-    GET  /api/drugs/search                          — Search drugs by name
-    GET  /api/drugs/{drug_id}                       — Get drug details
-    POST /api/check                                 — Analyze drug interactions
-    GET  /api/stats                                 — DB statistics (cached hourly)
-    GET  /api/interactions/{interaction_id}/evidence — Evidence for an interaction
+    GET  /health                                        — Health check with DB stats
+    GET  /api/v1/drugs/search                           — Search drugs by name (paginated)
+    GET  /api/v1/drugs/{drug_id}                        — Get drug details
+    POST /api/v1/check                                  — Analyze drug interactions
+    GET  /api/v1/stats                                  — DB statistics (cached hourly)
+    GET  /api/v1/interactions/{interaction_id}/evidence  — Evidence for an interaction
 """
 
 from __future__ import annotations
@@ -23,11 +25,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncGenerator
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from medgraph.api.auth import check_rate_limit, verify_api_key
+from medgraph.api.errors import register_error_handlers
+from medgraph.api.middleware import RequestIDMiddleware
 from medgraph.api.security import SecurityHeadersMiddleware
 
 from medgraph import __version__
@@ -44,6 +48,7 @@ from medgraph.api.models import (
     HealthResponse,
     InteractionResponse,
     JSONReportRequest,
+    PaginatedResponse,
     PDFReportRequest,
     PGxAnnotation,
     SearchResult,
@@ -102,21 +107,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("MEDGRAPH server shutting down")
 
 
-def _build_drug_response(drug: Drug, store: GraphStore) -> DrugResponse:
-    """Build DrugResponse including enzyme relations with names."""
+def _build_drug_response(
+    drug: Drug, store: GraphStore, enzymes_by_id: dict | None = None
+) -> DrugResponse:
+    """Build DrugResponse including enzyme relations with names.
+
+    Args:
+        enzymes_by_id: Pre-built enzyme lookup dict. If None, builds one via
+                       store.get_all_enzymes() (avoid in loops — pass a cached dict).
+    """
+    if enzymes_by_id is None:
+        enzymes_by_id = {e.id: e for e in store.get_all_enzymes()}
     relations = store.get_enzyme_relations(drug.id)
-    enzyme_relations: list[EnzymeRelationResponse] = []
-    for rel in relations:
-        # Look up enzyme name
-        enzyme = next((e for e in store.get_all_enzymes() if e.id == rel.enzyme_id), None)
-        enzyme_name = enzyme.name if enzyme else rel.enzyme_id
-        enzyme_relations.append(
-            EnzymeRelationResponse(
-                enzyme_name=enzyme_name,
-                relation_type=rel.relation_type,
-                strength=rel.strength,
-            )
+    enzyme_relations = [
+        EnzymeRelationResponse(
+            enzyme_name=enzymes_by_id[rel.enzyme_id].name
+            if rel.enzyme_id in enzymes_by_id
+            else rel.enzyme_id,
+            relation_type=rel.relation_type,
+            strength=rel.strength,
         )
+        for rel in relations
+    ]
     return DrugResponse(
         id=drug.id,
         name=drug.name,
@@ -138,6 +150,15 @@ def create_app() -> FastAPI:
         ),
         version=__version__,
         lifespan=lifespan,
+        openapi_tags=[
+            {"name": "system", "description": "Health checks and statistics"},
+            {"name": "drugs", "description": "Drug lookup and search"},
+            {"name": "analysis", "description": "Drug interaction analysis"},
+            {"name": "reports", "description": "Report generation (PDF, JSON, CSV)"},
+            {"name": "pharmacogenomics", "description": "CPIC pharmacogenomics guidelines"},
+        ],
+        contact={"name": "MEDGRAPH Team", "url": "https://github.com/HieuNTg/medgraph"},
+        license_info={"name": "MIT", "url": "https://opensource.org/licenses/MIT"},
     )
 
     # CORS origins: configurable via MEDGRAPH_CORS_ORIGINS env var (comma-separated)
@@ -149,9 +170,14 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=cors_origins,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "X-Api-Key"],
+        allow_headers=["Content-Type", "Authorization", "X-Api-Key", "X-Request-ID"],
+        expose_headers=["X-Request-ID"],
     )
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestIDMiddleware)
+
+    # RFC 7807 Problem Details error handlers
+    register_error_handlers(app)
 
     @app.get("/health", response_model=HealthResponse, tags=["system"])
     async def health() -> HealthResponse:
@@ -165,10 +191,13 @@ def create_app() -> FastAPI:
             graph_nodes=graph.number_of_nodes(),
         )
 
-    # Auth + rate limit dependencies for all /api/* endpoints
+    # ── Versioned API Router ──────────────────────────────────────────────
+    # All endpoints live on an APIRouter, mounted at both /api/v1 (canonical)
+    # and /api (backward compat). /health stays on the root app.
+    router = APIRouter()
     _api_deps = [Depends(verify_api_key), Depends(check_rate_limit)]
 
-    @app.get("/api/stats", response_model=StatsResponse, tags=["system"], dependencies=_api_deps)
+    @router.get("/stats", response_model=StatsResponse, tags=["system"], dependencies=_api_deps)
     async def stats() -> StatsResponse:
         cached_result, expiry = app.state.stats_cache
         now = time.monotonic()
@@ -186,24 +215,33 @@ def create_app() -> FastAPI:
         app.state.stats_cache = (result, now + _STATS_TTL)
         return result
 
-    @app.get("/api/drugs/search", response_model=list[SearchResult], tags=["drugs"], dependencies=_api_deps)
+    @router.get("/drugs/search", response_model=PaginatedResponse[SearchResult], tags=["drugs"], dependencies=_api_deps)
     async def search_drugs(
         q: str = Query(..., min_length=1, description="Drug name search query"),
         limit: int = Query(10, ge=1, le=50),
-    ) -> list[SearchResult]:
-        searcher: DrugSearcher = app.state.searcher
-        results = searcher.search(q, limit=limit)
-        return [
+        offset: int = Query(0, ge=0, description="Number of results to skip"),
+    ) -> PaginatedResponse[SearchResult]:
+        store: GraphStore = app.state.store
+        # Single DB connection for consistent count + results
+        drugs, total = store.search_drugs_with_count(q, limit=limit, offset=offset)
+        items = [
             SearchResult(
                 id=drug.id,
                 name=drug.name,
                 brand_names=drug.brand_names,
                 drug_class=drug.drug_class,
             )
-            for drug in results
+            for drug in drugs
         ]
+        return PaginatedResponse(
+            items=items,
+            total=total,
+            offset=offset,
+            limit=limit,
+            has_more=(offset + limit) < total,
+        )
 
-    @app.get("/api/drugs/{drug_id}", response_model=DrugResponse, tags=["drugs"], dependencies=_api_deps)
+    @router.get("/drugs/{drug_id}", response_model=DrugResponse, tags=["drugs"], dependencies=_api_deps)
     async def get_drug(drug_id: str) -> DrugResponse:
         store: GraphStore = app.state.store
         drug = store.get_drug_by_id(drug_id)
@@ -211,8 +249,8 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail=f"Drug not found: {drug_id}")
         return _build_drug_response(drug, store)
 
-    @app.get(
-        "/api/interactions/{interaction_id}/evidence",
+    @router.get(
+        "/interactions/{interaction_id}/evidence",
         response_model=list[EvidenceResponse],
         tags=["analysis"],
         dependencies=_api_deps,
@@ -239,7 +277,7 @@ def create_app() -> FastAPI:
                 )
         return evidence
 
-    @app.post("/api/check", response_model=CheckResponse, tags=["analysis"], dependencies=_api_deps)
+    @router.post("/check", response_model=CheckResponse, tags=["analysis"], dependencies=_api_deps)
     async def check(request: CheckRequest) -> CheckResponse:
         """
         Analyze drug-drug interactions for a set of drugs.
@@ -311,29 +349,9 @@ def create_app() -> FastAPI:
             report.overall_risk = analyzer.scorer.classify_severity(report.overall_score)
 
         # Build enzyme name cache (avoid repeated full enzyme lookups)
-        all_enzymes = {e.id: e for e in store.get_all_enzymes()}
+        enzymes_by_id = {e.id: e for e in store.get_all_enzymes()}
 
-        def make_drug_response(drug) -> DrugResponse:
-            relations = store.get_enzyme_relations(drug.id)
-            er = [
-                EnzymeRelationResponse(
-                    enzyme_name=all_enzymes[rel.enzyme_id].name
-                    if rel.enzyme_id in all_enzymes
-                    else rel.enzyme_id,
-                    relation_type=rel.relation_type,
-                    strength=rel.strength,
-                )
-                for rel in relations
-            ]
-            return DrugResponse(
-                id=drug.id,
-                name=drug.name,
-                brand_names=drug.brand_names,
-                drug_class=drug.drug_class,
-                enzyme_relations=er,
-            )
-
-        drugs_response = [make_drug_response(d) for d in report.drugs]
+        drugs_response = [_build_drug_response(d, store, enzymes_by_id) for d in report.drugs]
 
         interactions_response: list[InteractionResponse] = []
         for result in report.interactions:
@@ -396,8 +414,8 @@ def create_app() -> FastAPI:
 
             interactions_response.append(
                 InteractionResponse(
-                    drug_a=make_drug_response(result.drug_a),
-                    drug_b=make_drug_response(result.drug_b),
+                    drug_a=_build_drug_response(result.drug_a, store, enzymes_by_id),
+                    drug_b=_build_drug_response(result.drug_b, store, enzymes_by_id),
                     severity=result.severity,
                     risk_score=result.risk_score,
                     description=description,
@@ -421,7 +439,7 @@ def create_app() -> FastAPI:
             summary=explain_report(report),
         )
 
-    @app.post("/api/report/pdf", tags=["reports"], dependencies=_api_deps)
+    @router.post("/report/pdf", tags=["reports"], dependencies=_api_deps)
     async def generate_pdf_report(request: PDFReportRequest) -> Response:
         """Generate a PDF report from check results."""
         from medgraph.reports.pdf_generator import generate_report_pdf
@@ -438,7 +456,7 @@ def create_app() -> FastAPI:
             },
         )
 
-    @app.post("/api/report/json", tags=["reports"], dependencies=_api_deps)
+    @router.post("/report/json", tags=["reports"], dependencies=_api_deps)
     async def generate_json_report(request: JSONReportRequest) -> Response:
         """Generate a structured JSON report from check results."""
         from medgraph.reports.json_generator import generate_report_json
@@ -455,7 +473,7 @@ def create_app() -> FastAPI:
             },
         )
 
-    @app.post("/api/report/csv", tags=["reports"], dependencies=_api_deps)
+    @router.post("/report/csv", tags=["reports"], dependencies=_api_deps)
     async def generate_csv_report(request: CSVReportRequest) -> Response:
         """Generate a CSV report of drug interactions."""
         from medgraph.reports.csv_generator import generate_report_csv
@@ -471,7 +489,7 @@ def create_app() -> FastAPI:
             },
         )
 
-    @app.get("/api/pgx/guidelines", tags=["pharmacogenomics"], dependencies=_api_deps)
+    @router.get("/pgx/guidelines", tags=["pharmacogenomics"], dependencies=_api_deps)
     async def get_pgx_guidelines(
         drug_id: str = Query(..., description="Drug ID (e.g. DB00318)"),
     ) -> list[dict]:
@@ -487,6 +505,10 @@ def create_app() -> FastAPI:
             }
             for gl in guidelines
         ]
+
+    # Mount router at /api/v1 (canonical) and /api (backward compat)
+    app.include_router(router, prefix="/api/v1")
+    app.include_router(router, prefix="/api")
 
     return app
 

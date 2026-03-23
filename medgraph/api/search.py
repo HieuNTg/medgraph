@@ -34,29 +34,31 @@ class DrugSearcher:
         self.use_rxnorm = use_rxnorm
         self._rxnorm: Optional[RxNormClient] = RxNormClient() if use_rxnorm else None
 
-    def search(self, query: str, limit: int = 10) -> list[Drug]:
+    def search(self, query: str, limit: int = 10, offset: int = 0) -> list[Drug]:
         """
         Search for drugs by name.
 
         Args:
             query: Drug name or partial name
             limit: Maximum results
+            offset: Number of results to skip (for pagination)
 
         Returns:
             List of matching Drug objects
         """
-        # 1. Try exact match
-        exact = self.store.get_drug_by_name(query)
-        if exact:
-            return [exact]
+        # 1. Try exact match (only on first page)
+        if offset == 0:
+            exact = self.store.get_drug_by_name(query)
+            if exact:
+                return [exact]
 
         # 2. LIKE search
-        results = self.store.search_drugs(query, limit=limit)
+        results = self.store.search_drugs(query, limit=limit, offset=offset)
         if results:
             return results
 
-        # 3. RxNorm normalization fallback
-        if self._rxnorm:
+        # 3. RxNorm normalization fallback (only on first page)
+        if offset == 0 and self._rxnorm:
             normalized = self._rxnorm.normalize_drug_name(query)
             if normalized:
                 rxcui, norm_name = normalized
@@ -65,6 +67,10 @@ class DrugSearcher:
                     return results
 
         return []
+
+    def count(self, query: str) -> int:
+        """Count total matching drugs for a search query."""
+        return self.store.count_search_drugs(query)
 
     def resolve_drug_names(self, names: list[str]) -> tuple[list[Drug], list[str]]:
         """

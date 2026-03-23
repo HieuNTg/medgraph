@@ -5,9 +5,11 @@ FastAPI request/response models for MEDGRAPH API.
 from __future__ import annotations
 
 import re
-from typing import Optional
+from typing import Generic, Optional, TypeVar
 
 from pydantic import BaseModel, field_validator
+
+T = TypeVar("T")
 
 # Only allow alphanumeric, spaces, hyphens, apostrophes, and parentheses in drug names
 _DRUG_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9\s\-'(),.]+$")
@@ -127,6 +129,16 @@ class StatsResponse(BaseModel):
     interaction_count: int
     enzyme_count: int
     adverse_event_count: int
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """Offset-based paginated response wrapper."""
+
+    items: list[T]
+    total: int
+    offset: int
+    limit: int
+    has_more: bool
 
 
 class SearchResult(BaseModel):

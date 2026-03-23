@@ -250,14 +250,46 @@ class GraphStore:
             ).fetchone()
         return self._row_to_drug(row) if row else None
 
-    def search_drugs(self, query: str, limit: int = 10) -> list[Drug]:
-        pattern = f"%{query}%"
+    @staticmethod
+    def _escape_like(query: str) -> str:
+        """Escape LIKE wildcard characters (%, _) in user input."""
+        return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+    def search_drugs(self, query: str, limit: int = 10, offset: int = 0) -> list[Drug]:
+        escaped = self._escape_like(query)
+        pattern = f"%{escaped}%"
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM drugs WHERE LOWER(name) LIKE LOWER(?) LIMIT ?",
-                (pattern, limit),
+                "SELECT * FROM drugs WHERE LOWER(name) LIKE LOWER(?) ESCAPE '\\' LIMIT ? OFFSET ?",
+                (pattern, limit, offset),
             ).fetchall()
         return [self._row_to_drug(r) for r in rows]
+
+    def search_drugs_with_count(
+        self, query: str, limit: int = 10, offset: int = 0
+    ) -> tuple[list["Drug"], int]:
+        """Search drugs and return (results, total_count) in a single connection."""
+        escaped = self._escape_like(query)
+        pattern = f"%{escaped}%"
+        where = "WHERE LOWER(name) LIKE LOWER(?) ESCAPE '\\'"
+        with self._connect() as conn:
+            total = conn.execute(f"SELECT COUNT(*) FROM drugs {where}", (pattern,)).fetchone()[0]
+            rows = conn.execute(
+                f"SELECT * FROM drugs {where} LIMIT ? OFFSET ?",
+                (pattern, limit, offset),
+            ).fetchall()
+        return [self._row_to_drug(r) for r in rows], total
+
+    def count_search_drugs(self, query: str) -> int:
+        """Count total matching drugs for a search query."""
+        escaped = self._escape_like(query)
+        pattern = f"%{escaped}%"
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM drugs WHERE LOWER(name) LIKE LOWER(?) ESCAPE '\\'",
+                (pattern,),
+            ).fetchone()
+        return row[0]
 
     def get_all_drugs(self) -> list[Drug]:
         with self._connect() as conn:

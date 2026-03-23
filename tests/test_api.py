@@ -50,6 +50,7 @@ def client(seeded_store: GraphStore) -> TestClient:
     app.state.graph = graph
     app.state.analyzer = analyzer
     app.state.searcher = searcher
+    app.state.stats_cache = (None, 0.0)
 
     # Use lifespan=False so our injected state is not overwritten
     with TestClient(app, raise_server_exceptions=True) as c:
@@ -58,6 +59,7 @@ def client(seeded_store: GraphStore) -> TestClient:
         app.state.graph = graph
         app.state.analyzer = analyzer
         app.state.searcher = searcher
+        app.state.stats_cache = (None, 0.0)
         yield c
 
 
@@ -92,10 +94,12 @@ class TestCheckEndpoint:
     def test_check_unknown_drug_400(self, client: TestClient) -> None:
         resp = client.post("/api/check", json={"drugs": ["notadrug123xyz", "Aspirin"]})
         assert resp.status_code == 400
-        detail = resp.json()["detail"]
-        assert isinstance(detail, dict)
-        assert "unresolved" in detail
-        assert len(detail["unresolved"]) > 0
+        body = resp.json()
+        # RFC 7807: detail is a string, dict content in extensions
+        assert "detail" in body
+        assert "extensions" in body
+        assert "unresolved" in body["extensions"]
+        assert len(body["extensions"]["unresolved"]) > 0
 
     def test_check_completely_unknown_drug_400(self, client: TestClient) -> None:
         resp = client.post("/api/check", json={"drugs": ["zzzdrug999"]})
@@ -110,7 +114,11 @@ class TestCheckEndpoint:
     def test_check_single_drug_400(self, client: TestClient) -> None:
         resp = client.post("/api/check", json={"drugs": ["Warfarin"]})
         assert resp.status_code == 400
-        assert "minimum 2" in resp.json()["detail"].lower()
+        body = resp.json()
+        assert "minimum 2" in body["detail"].lower()
+        # RFC 7807 fields present
+        assert body["status"] == 400
+        assert "title" in body
 
     def test_check_too_many_drugs_400(self, client: TestClient) -> None:
         drugs = ["Warfarin"] * 11
@@ -153,20 +161,29 @@ class TestDrugSearch:
     def test_search_asp_returns_aspirin(self, client: TestClient) -> None:
         resp = client.get("/api/drugs/search?q=asp")
         assert resp.status_code == 200
-        names = [r["name"] for r in resp.json()]
+        data = resp.json()
+        names = [r["name"] for r in data["items"]]
         assert any("aspirin" in n.lower() or "Aspirin" in n for n in names)
 
     def test_search_no_results_returns_empty(self, client: TestClient) -> None:
         resp = client.get("/api/drugs/search?q=zzzzzzzznotadrug")
         assert resp.status_code == 200
-        assert resp.json() == []
+        data = resp.json()
+        assert data["items"] == []
+        assert data["total"] == 0
+        assert data["has_more"] is False
 
     def test_search_result_has_expected_fields(self, client: TestClient) -> None:
         resp = client.get("/api/drugs/search?q=war")
         assert resp.status_code == 200
-        results = resp.json()
-        if results:
-            first = results[0]
+        data = resp.json()
+        assert "items" in data
+        assert "total" in data
+        assert "offset" in data
+        assert "limit" in data
+        assert "has_more" in data
+        if data["items"]:
+            first = data["items"][0]
             assert "id" in first
             assert "name" in first
             assert "brand_names" in first
@@ -175,7 +192,7 @@ class TestDrugSearch:
     def test_search_limit_respected(self, client: TestClient) -> None:
         resp = client.get("/api/drugs/search?q=a&limit=3")
         assert resp.status_code == 200
-        assert len(resp.json()) <= 3
+        assert len(resp.json()["items"]) <= 3
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +204,7 @@ class TestGetDrug:
     def _get_warfarin_id(self, client: TestClient) -> str:
         resp = client.get("/api/drugs/search?q=Warfarin")
         assert resp.status_code == 200
-        results = resp.json()
+        results = resp.json()["items"]
         assert results, "Warfarin must be in seeded store"
         return results[0]["id"]
 
@@ -358,7 +375,7 @@ class TestPGxGuidelinesEndpoint:
         # First find Codeine's drug ID
         search = client.get("/api/drugs/search?q=Codeine")
         assert search.status_code == 200
-        results = search.json()
+        results = search.json()["items"]
         if not results:
             pytest.skip("Codeine not in seeded store")
 
