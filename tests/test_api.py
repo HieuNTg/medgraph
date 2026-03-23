@@ -102,10 +102,10 @@ class TestCheckEndpoint:
         # single drug → 400 first
         assert resp.status_code == 400
 
-    def test_check_empty_list_400(self, client: TestClient) -> None:
+    def test_check_empty_list_422(self, client: TestClient) -> None:
         resp = client.post("/api/check", json={"drugs": []})
-        assert resp.status_code == 400
-        assert "no drugs" in resp.json()["detail"].lower()
+        # Pydantic validator rejects empty list before endpoint code runs
+        assert resp.status_code == 422
 
     def test_check_single_drug_400(self, client: TestClient) -> None:
         resp = client.post("/api/check", json={"drugs": ["Warfarin"]})
