@@ -9,7 +9,8 @@ services:
       # Persist SQLite database across container restarts
       - medgraph-data:/app/data
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       - MEDGRAPH_HOST=0.0.0.0
       - MEDGRAPH_PORT=8000

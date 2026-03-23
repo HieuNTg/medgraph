@@ -1,0 +1,50 @@
+# MEDGRAPH Production Caddyfile
+# Replace {$MEDGRAPH_DOMAIN} with your domain or use env var
+# For local/dev testing without TLS: replace domain with :80
+
+{$MEDGRAPH_DOMAIN:localhost} {
+	# ── Security Headers ─────────────────────────────────────────────
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"
+		-Server
+	}
+
+	# ── API reverse proxy ────────────────────────────────────────────
+	handle /api/* {
+		reverse_proxy medgraph:8000
+	}
+
+	handle /health* {
+		reverse_proxy medgraph:8000
+	}
+
+	handle /docs* {
+		reverse_proxy medgraph:8000
+	}
+
+	handle /openapi.json {
+		reverse_proxy medgraph:8000
+	}
+
+	# ── Metrics: internal only (block external access) ───────────────
+	handle /metrics {
+		respond "Forbidden" 403
+	}
+
+	# ── Frontend SPA ─────────────────────────────────────────────────
+	handle {
+		root * /srv/frontend
+		try_files {path} /index.html
+		file_server
+	}
+
+	# ── Logging ──────────────────────────────────────────────────────
+	log {
+		output stdout
+		format json
+	}
+}

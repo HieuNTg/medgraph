@@ -1,0 +1,115 @@
+# MEDGRAPH Production Docker Compose
+# Usage: docker compose -f docker-compose.prod.yml up -d
+#
+# Prerequisites:
+#   1. Copy .env.example to .env and configure
+#   2. Set MEDGRAPH_DOMAIN to your domain (or leave localhost for local testing)
+#   3. Ensure ports 80/443 are open for Caddy TLS provisioning
+
+services:
+  # ── Reverse Proxy (TLS + static files) ─────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data        # TLS certificates
+      - caddy-config:/config
+      - frontend-assets:/srv/frontend:ro
+    environment:
+      - MEDGRAPH_DOMAIN=${MEDGRAPH_DOMAIN:-localhost}
+    depends_on:
+      medgraph:
+        condition: service_healthy
+    networks:
+      - medgraph-net
+
+  # ── Application ────────────────────────────────────────────────────
+  medgraph:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - medgraph-data:/app/data
+      - frontend-assets:/app/dashboard/dist
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - MEDGRAPH_HOST=0.0.0.0
+      - MEDGRAPH_PORT=8000
+      - MEDGRAPH_ENV=production
+      - MEDGRAPH_LOG_FORMAT=json
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - medgraph-net
+    # Do NOT expose port 8000 — Caddy handles external traffic
+
+  # ── Metrics (optional) ────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    restart: unless-stopped
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+    networks:
+      - medgraph-net
+    # Not exposed externally — access via Grafana or SSH tunnel
+    profiles:
+      - monitoring
+
+  # ── Dashboards (optional) ─────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    restart: unless-stopped
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      # IMPORTANT: Change this password before deploying monitoring
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme-insecure}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+    ports:
+      - "127.0.0.1:3000:3000"  # localhost only
+    depends_on:
+      - prometheus
+    networks:
+      - medgraph-net
+    profiles:
+      - monitoring
+
+networks:
+  medgraph-net:
+    driver: bridge
+
+volumes:
+  medgraph-data:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local
+  frontend-assets:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

@@ -1,0 +1,13 @@
+# MEDGRAPH Prometheus scrape configuration
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "medgraph"
+    scrape_timeout: 10s
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["medgraph:8000"]
+        labels:
+          service: "medgraph-api"
