@@ -12,25 +12,27 @@ Backend serves both the REST API and (in production) the compiled frontend stati
 │            React 19 + TypeScript + Vite SPA             │
 │   DrugInput → TanStack Query → Results / CascadePath    │
 └──────────────────────┬──────────────────────────────────┘
-                       │  HTTP/JSON (REST)
+                       │  HTTP/JSON (REST + RFC 7807)
 ┌──────────────────────▼──────────────────────────────────┐
-│                    FastAPI  (port 8000)                  │
-│  /health  /api/drugs/search  /api/check  /api/stats     │
-│                  CORS middleware                         │
+│                  FastAPI (port 8000)                     │
+│  /health  /api/{v1}/drugs/search  /api/{v1}/check       │
+│  RequestID middleware, RFC 7807 errors, CORS            │
+│  OpenAPI at /docs (tags, contact, license)              │
 └──────┬───────────────┬──────────────────────────────────┘
        │               │
 ┌──────▼──────┐ ┌──────▼──────────────────────────────────┐
 │  GraphStore │ │           Analysis Engine                │
 │  (SQLite)   │ │  GraphBuilder → NetworkX DiGraph         │
-│             │ │  CascadeAnalyzer → PathFinder            │
-│  drugs      │ │  RiskScorer                              │
-│  enzymes    │ └─────────────────────────────────────────┘
-│  interactions│
-│  drug_enzyme │ ┌──────────────────────────────────────────┐
-│  adverse_ev  │ │          Data Pipeline (CLI)              │
-└─────────────┘ │  seed_data.py → optional DrugBank CSV    │
-                │  optional OpenFDA FAERS enrichment        │
-                └──────────────────────────────────────────┘
+│  + Genetic  │ │  CascadeAnalyzer → PathFinder            │
+│  Guidelines │ │  RiskScorer + PGx scoring                │
+│             │ └─────────────────────────────────────────┘
+│  drugs      │
+│  enzymes    │ ┌──────────────────────────────────────────┐
+│  enzyme_rel │ │          Data Pipeline (CLI)              │
+│  interactions │  seed_data.py → optional DrugBank CSV    │
+│  adverse_ev │ │  optional OpenFDA FAERS enrichment        │
+│  genetic_gl │ │  CPIC pharmacogenomics guidelines         │
+└─────────────┘ └──────────────────────────────────────────┘
 ```
 
 ## Data Flow
@@ -62,13 +64,17 @@ Backend serves both the REST API and (in production) the compiled frontend stati
 
 WAL mode enabled; foreign keys enforced.
 
-## API Layer
+## API Layer (Phase 2: Hardened)
 - **Framework**: FastAPI with Pydantic V2 models
+- **Routing**: Endpoints mounted at both `/api/v1/*` (canonical) and `/api/*` (backward compat)
 - **Lifespan**: graph + store loaded once at startup via `asynccontextmanager`
-- **CORS**: configurable via `MEDGRAPH_CORS_ORIGINS` env var (default: localhost:5173, localhost:3000)
-- **Stats cache**: 1-hour in-process TTL for `/api/stats`
+- **Error Handling**: RFC 7807 Problem Details format (application/problem+json) for all errors
+- **Request Tracing**: `RequestIDMiddleware` adds X-Request-ID header (UUID4 if not provided)
+- **CORS**: configurable via `MEDGRAPH_CORS_ORIGINS` env var; exposes X-Request-ID header
+- **Stats cache**: 1-hour in-process TTL for `/api/v1/stats`
 - **Security Headers**: `SecurityHeadersMiddleware` adds X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP (report-only), and HSTS (production only)
 - **Authentication**: API key verification & rate limiting on `/api/*` endpoints
+- **OpenAPI**: Metadata includes contact (MEDGRAPH Team), license (MIT), tags (system/drugs/analysis/reports/pharmacogenomics)
 
 ## Frontend Architecture
 - **Router**: React Router v7 (`BrowserRouter`)
