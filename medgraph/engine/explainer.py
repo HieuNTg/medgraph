@@ -87,9 +87,7 @@ def explain_interaction(result: DrugInteractionResult) -> str:
     if result.evidence:
         total = sum(e.evidence_count for e in result.evidence if e.evidence_count > 0)
         if total > 0:
-            parts.append(
-                f"This interaction is supported by {total:,} FDA adverse event reports."
-            )
+            parts.append(f"This interaction is supported by {total:,} FDA adverse event reports.")
 
     return " ".join(parts)
 
@@ -106,13 +104,9 @@ def explain_cascade_path(path: CascadePath) -> str:
         prefix = f"{adv} " if adv else ""
 
         if step.target_type == "enzyme":
-            step_descriptions.append(
-                f"{step.source_drug} {prefix}{verb} {step.target}"
-            )
+            step_descriptions.append(f"{step.source_drug} {prefix}{verb} {step.target}")
         else:
-            step_descriptions.append(
-                f"{step.target} {step.effect}"
-            )
+            step_descriptions.append(f"{step.target} {step.effect}")
 
     chain = ", which ".join(step_descriptions) if step_descriptions else ""
     severity = _SEVERITY_DESC.get(path.net_severity, path.net_severity)
@@ -188,10 +182,7 @@ def explain_report(report: InteractionReport) -> str:
     # Highlight critical/major interactions
     critical = [r for r in report.interactions if r.severity in ("critical", "major")]
     if critical:
-        names = [
-            f"{r.drug_a.name} + {r.drug_b.name} ({r.severity})"
-            for r in critical
-        ]
+        names = [f"{r.drug_a.name} + {r.drug_b.name} ({r.severity})" for r in critical]
         parts.append(f"Key concerns: {'; '.join(names)}.")
 
     return " ".join(parts)

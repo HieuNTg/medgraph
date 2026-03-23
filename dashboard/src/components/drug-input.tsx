@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { searchDrugs } from "@/lib/api";
 import type { SearchResult } from "@/lib/types";
+import { VoiceInput } from "./voice-input";
 
 interface DrugInputProps {
   onSubmit: (drugs: string[]) => void;
@@ -131,34 +132,44 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
 
       {/* Input + dropdown */}
       <div className="relative">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
-          <Input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => {
+        <div className="flex items-start gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
+            <Input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => {
+                setForceClosed(false);
+              }}
+              placeholder={
+                selectedDrugs.length === 0
+                  ? "Search for a medication (e.g. Warfarin, Aspirin)..."
+                  : selectedDrugs.length >= 10
+                  ? "Maximum 10 drugs reached"
+                  : "Add another medication..."
+              }
+              disabled={selectedDrugs.length >= 10 || loading}
+              className="pl-9"
+              role="combobox"
+              aria-label="Search medications"
+              aria-autocomplete="list"
+              aria-expanded={open}
+              aria-controls="drug-search-listbox"
+            />
+            {searching && (
+              <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[var(--muted-foreground)]" />
+            )}
+          </div>
+          <VoiceInput
+            onResult={(text) => {
+              setQuery(text);
               setForceClosed(false);
+              inputRef.current?.focus();
             }}
-            placeholder={
-              selectedDrugs.length === 0
-                ? "Search for a medication (e.g. Warfarin, Aspirin)..."
-                : selectedDrugs.length >= 10
-                ? "Maximum 10 drugs reached"
-                : "Add another medication..."
-            }
             disabled={selectedDrugs.length >= 10 || loading}
-            className="pl-9"
-            role="combobox"
-            aria-label="Search medications"
-            aria-autocomplete="list"
-            aria-expanded={open}
-            aria-controls="drug-search-listbox"
           />
-          {searching && (
-            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[var(--muted-foreground)]" />
-          )}
         </div>
 
         {/* Dropdown */}

@@ -49,11 +49,11 @@ _THRESHOLDS = [
 
 # Maps external severity codes (e.g. DrugBank A-X) to internal severity levels
 _SEVERITY_CODE_MAP: dict[str, str] = {
-    "A": "critical",   # contraindicated
+    "A": "critical",  # contraindicated
     "B": "major",
     "C": "moderate",
     "D": "minor",
-    "X": "critical",   # avoid combination
+    "X": "critical",  # avoid combination
 }
 
 

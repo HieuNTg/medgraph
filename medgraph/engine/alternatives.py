@@ -8,11 +8,10 @@ Used to suggest therapeutic swaps when a drug causes interactions.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import networkx as nx
 
-from medgraph.graph.models import DrugEnzymeRelation
 from medgraph.graph.store import GraphStore
 
 logger = logging.getLogger(__name__)
@@ -46,9 +45,7 @@ class AlternativesFinder:
         self.graph = graph
         self.store = store
 
-    def find_alternatives(
-        self, drug_id: str, regimen: list[str]
-    ) -> list[Alternative]:
+    def find_alternatives(self, drug_id: str, regimen: list[str]) -> list[Alternative]:
         """
         For a drug causing interactions in a regimen, find same-class alternatives
         that share fewer enzyme conflicts with the rest of the regimen.

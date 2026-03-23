@@ -22,9 +22,7 @@ def _get_or_create_histogram(
         return registry._names_to_collectors[name]  # type: ignore[attr-defined]
 
 
-def _get_or_create_gauge(
-    name: str, documentation: str, registry: CollectorRegistry
-) -> Gauge:
+def _get_or_create_gauge(name: str, documentation: str, registry: CollectorRegistry) -> Gauge:
     """Get existing gauge or create new one (safe for test reloads)."""
     try:
         return Gauge(name, documentation, registry=registry)

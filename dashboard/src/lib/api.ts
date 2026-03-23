@@ -7,6 +7,7 @@ import type {
   Drug,
   HubDrugResponse,
   MedicationProfile,
+  OptimizationResult,
   PathwayResponse,
   SearchResult,
   TokenResponse,
@@ -99,6 +100,16 @@ export function getDeprescribingRecs(
   return apiFetch("/api/deprescribe", {
     method: "POST",
     body: JSON.stringify({ drugs }),
+  });
+}
+
+export function optimizeRegimen(
+  drugs: string[],
+  mustKeep: string[] = []
+): Promise<OptimizationResult> {
+  return apiFetch("/api/v1/optimize", {
+    method: "POST",
+    body: JSON.stringify({ drugs, must_keep: mustKeep }),
   });
 }
 

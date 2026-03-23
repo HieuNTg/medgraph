@@ -195,6 +195,7 @@ class CSVReportRequest(BaseModel):
 
 # ── Graph / Advanced Analysis Models ─────────────────────────────────────────
 
+
 class PathwayNode(BaseModel):
     id: str
     type: str  # "drug" | "enzyme"
@@ -262,6 +263,7 @@ class ContraindicationResponse(BaseModel):
 
 # ── Auth / User Profile Models ────────────────────────────────────────────────
 
+
 class RegisterRequest(BaseModel):
     email: str
     password: str
@@ -325,3 +327,17 @@ class AuditLogResponse(BaseModel):
     resource_type: Optional[str]
     resource_id: Optional[str]
     created_at: str
+
+
+class OptimizeRequest(BaseModel):
+    drugs: list[str]
+    must_keep: list[str] = []
+
+
+class OptimizeResponse(BaseModel):
+    original_risk: float
+    optimized_risk: float
+    drugs_to_remove: list[str]
+    alternative_regimens: list[dict]
+    rationale: str
+    disclaimer: str

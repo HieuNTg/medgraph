@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any
 
 import networkx as nx
 
@@ -72,8 +71,7 @@ class CDSHooksService:
             id="medgraph-order-select",
             prefetch={
                 "patientMedications": (
-                    "MedicationRequest?patient={{context.patientId}}"
-                    "&status=active"
+                    "MedicationRequest?patient={{context.patientId}}&status=active"
                 ),
             },
         )
@@ -154,7 +152,7 @@ class CDSHooksService:
 
         # Build detail from direct interaction data
         detail_parts: list[str] = [
-            f"**Educational information only — not clinical advice.**",
+            "**Educational information only — not clinical advice.**",
             "",
         ]
 
@@ -169,18 +167,22 @@ class CDSHooksService:
             for path in interaction.cascade_paths[:3]:
                 for step in path.steps:
                     if "enzyme" in step.relation.lower() or step.relation in (
-                        "inhibits", "induces", "metabolized_by"
+                        "inhibits",
+                        "induces",
+                        "metabolized_by",
                     ):
                         enzymes.add(step.target)
             if enzymes:
                 detail_parts.append(f"_Involved enzymes:_ {', '.join(sorted(enzymes))}")
 
-        detail_parts.extend([
-            "",
-            f"_Risk score:_ {interaction.risk_score:.2f}",
-            "",
-            self.MEDICAL_DISCLAIMER,
-        ])
+        detail_parts.extend(
+            [
+                "",
+                f"_Risk score:_ {interaction.risk_score:.2f}",
+                "",
+                self.MEDICAL_DISCLAIMER,
+            ]
+        )
 
         return CDSCard(
             uuid=str(uuid.uuid4()),

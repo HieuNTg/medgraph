@@ -596,16 +596,12 @@ class GraphStore:
 
     def get_user_by_email(self, email: str) -> Optional[dict]:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM users WHERE email = ?", (email,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         return dict(row) if row else None
 
     def update_user_login(self, user_id: str, last_login: str) -> None:
         with self._connect() as conn:
-            conn.execute(
-                "UPDATE users SET last_login = ? WHERE id = ?", (last_login, user_id)
-            )
+            conn.execute("UPDATE users SET last_login = ? WHERE id = ?", (last_login, user_id))
 
     # -------------------------------------------------------------------------
     # Medication Profiles
@@ -666,9 +662,7 @@ class GraphStore:
 
     def delete_profile(self, profile_id: str) -> None:
         with self._connect() as conn:
-            conn.execute(
-                "DELETE FROM medication_profiles WHERE id = ?", (profile_id,)
-            )
+            conn.execute("DELETE FROM medication_profiles WHERE id = ?", (profile_id,))
 
     @staticmethod
     def _row_to_profile(row: sqlite3.Row) -> dict:
@@ -699,9 +693,7 @@ class GraphStore:
                 (analysis_id, user_id, json.dumps(drug_ids), result_json, overall_risk, created_at),
             )
 
-    def get_history_by_user(
-        self, user_id: str, limit: int = 20, offset: int = 0
-    ) -> list[dict]:
+    def get_history_by_user(self, user_id: str, limit: int = 20, offset: int = 0) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute(
                 """
@@ -749,9 +741,7 @@ class GraphStore:
 
     def get_shared_result(self, share_id: str) -> Optional[dict]:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM shared_results WHERE id = ?", (share_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM shared_results WHERE id = ?", (share_id,)).fetchone()
         return dict(row) if row else None
 
     # -------------------------------------------------------------------------
@@ -778,8 +768,14 @@ class GraphStore:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    log_id, user_id, action, resource_type, resource_id,
-                    ip_address, user_agent, created_at,
+                    log_id,
+                    user_id,
+                    action,
+                    resource_type,
+                    resource_id,
+                    ip_address,
+                    user_agent,
+                    created_at,
                 ),
             )
 
@@ -926,5 +922,7 @@ class GraphStore:
             evidence_level=row["evidence_level"] if "evidence_level" in keys else "D",
             source_citation=row["source_citation"] if "source_citation" in keys else None,
             last_updated=row["last_updated"] if "last_updated" in keys else None,
-            clinical_significance=row["clinical_significance"] if "clinical_significance" in keys else None,
+            clinical_significance=row["clinical_significance"]
+            if "clinical_significance" in keys
+            else None,
         )

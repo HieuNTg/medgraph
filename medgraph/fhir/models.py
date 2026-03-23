@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 # ── Core FHIR datatypes ───────────────────────────────────────────────────────
 
+
 class FHIRCoding(BaseModel):
     system: Optional[str] = None
     code: Optional[str] = None
@@ -31,6 +32,7 @@ class FHIRReference(BaseModel):
 
 
 # ── FHIR R4 Resources ─────────────────────────────────────────────────────────
+
 
 class MedicationRequest(BaseModel):
     resourceType: str = "MedicationRequest"
@@ -59,6 +61,7 @@ class OperationOutcome(BaseModel):
 
 
 # ── CDS Hooks models ──────────────────────────────────────────────────────────
+
 
 class CDSRequest(BaseModel):
     hook: str

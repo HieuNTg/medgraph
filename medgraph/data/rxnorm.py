@@ -72,9 +72,7 @@ class RxNormClient:
             results[name] = match[0] if match else None
         return results
 
-    def resolve_rxcui_to_drug_id(
-        self, rxcui: str, store: "GraphStore"
-    ) -> Optional[str]:
+    def resolve_rxcui_to_drug_id(self, rxcui: str, store: "GraphStore") -> Optional[str]:
         """
         Resolve a RxNorm CUI to a MEDGRAPH drug ID using the store.
 

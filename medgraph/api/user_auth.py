@@ -46,9 +46,7 @@ class UserAuth:
 
     def _hash_password(self, password: str) -> str:
         salt = os.urandom(16)
-        dk = hashlib.pbkdf2_hmac(
-            "sha256", password.encode(), salt, self._HASH_ITERATIONS
-        )
+        dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, self._HASH_ITERATIONS)
         return f"pbkdf2:sha256:{self._HASH_ITERATIONS}:{_b64url_encode(salt)}:{_b64url_encode(dk)}"
 
     def _verify_password(self, password: str, stored_hash: str) -> bool:

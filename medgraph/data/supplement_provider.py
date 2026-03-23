@@ -279,46 +279,131 @@ SUPPLEMENT_DRUGS: list[dict] = [
 
 SUPPLEMENT_ENZYME_RELATIONS: list[dict] = [
     # St. John's Wort — strong CYP3A4 inducer
-    {"drug_id": "SUPP-SJW", "enzyme_id": "CYP3A4", "relation_type": "induces", "strength": "strong"},
-    {"drug_id": "SUPP-SJW", "enzyme_id": "CYP2C9", "relation_type": "induces", "strength": "moderate"},
-    {"drug_id": "SUPP-SJW", "enzyme_id": "CYP1A2", "relation_type": "induces", "strength": "moderate"},
-    {"drug_id": "SUPP-SJW", "enzyme_id": "PGLYCO", "relation_type": "induces", "strength": "strong"},
+    {
+        "drug_id": "SUPP-SJW",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "induces",
+        "strength": "strong",
+    },
+    {
+        "drug_id": "SUPP-SJW",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "induces",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "SUPP-SJW",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "induces",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "SUPP-SJW",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "induces",
+        "strength": "strong",
+    },
     # Ginkgo biloba
-    {"drug_id": "SUPP-GIN", "enzyme_id": "CYP2C19", "relation_type": "inhibits", "strength": "moderate"},
+    {
+        "drug_id": "SUPP-GIN",
+        "enzyme_id": "CYP2C19",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     {"drug_id": "SUPP-GIN", "enzyme_id": "CYP2C9", "relation_type": "induces", "strength": "weak"},
     # Turmeric / Curcumin
-    {"drug_id": "SUPP-TUR", "enzyme_id": "CYP1A2", "relation_type": "inhibits", "strength": "moderate"},
+    {
+        "drug_id": "SUPP-TUR",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     {"drug_id": "SUPP-TUR", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "weak"},
-    {"drug_id": "SUPP-TUR", "enzyme_id": "PGLYCO", "relation_type": "inhibits", "strength": "moderate"},
+    {
+        "drug_id": "SUPP-TUR",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     # Grapefruit — potent intestinal CYP3A4 inhibitor
-    {"drug_id": "SUPP-GRF", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "strong"},
+    {
+        "drug_id": "SUPP-GRF",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "strong",
+    },
     # Garlic
     {"drug_id": "SUPP-GAR", "enzyme_id": "CYP3A4", "relation_type": "induces", "strength": "weak"},
     # Ginseng
     {"drug_id": "SUPP-GNS", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "weak"},
     {"drug_id": "SUPP-GNS", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "weak"},
     # Echinacea
-    {"drug_id": "SUPP-ECH", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "moderate"},
+    {
+        "drug_id": "SUPP-ECH",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     {"drug_id": "SUPP-ECH", "enzyme_id": "CYP1A2", "relation_type": "inhibits", "strength": "weak"},
     # Valerian
     {"drug_id": "SUPP-VAL", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "weak"},
     # Kava
-    {"drug_id": "SUPP-KAV", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "moderate"},
-    {"drug_id": "SUPP-KAV", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "moderate"},
-    {"drug_id": "SUPP-KAV", "enzyme_id": "CYP1A2", "relation_type": "inhibits", "strength": "moderate"},
+    {
+        "drug_id": "SUPP-KAV",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "SUPP-KAV",
+        "enzyme_id": "CYP2D6",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "SUPP-KAV",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     # Milk Thistle
     {"drug_id": "SUPP-MLK", "enzyme_id": "CYP2C9", "relation_type": "inhibits", "strength": "weak"},
     {"drug_id": "SUPP-MLK", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "weak"},
     # Saw Palmetto
     {"drug_id": "SUPP-SAW", "enzyme_id": "CYP2D6", "relation_type": "inhibits", "strength": "weak"},
     # Melatonin — CYP1A2 substrate
-    {"drug_id": "SUPP-MEL", "enzyme_id": "CYP1A2", "relation_type": "metabolized_by", "strength": "strong"},
+    {
+        "drug_id": "SUPP-MEL",
+        "enzyme_id": "CYP1A2",
+        "relation_type": "metabolized_by",
+        "strength": "strong",
+    },
     # Green Tea Extract
-    {"drug_id": "SUPP-GREE", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "weak"},
-    {"drug_id": "SUPP-GREE", "enzyme_id": "PGLYCO", "relation_type": "inhibits", "strength": "moderate"},
+    {
+        "drug_id": "SUPP-GREE",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "weak",
+    },
+    {
+        "drug_id": "SUPP-GREE",
+        "enzyme_id": "PGLYCO",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
     # Pomegranate
-    {"drug_id": "SUPP-POME", "enzyme_id": "CYP3A4", "relation_type": "inhibits", "strength": "moderate"},
-    {"drug_id": "SUPP-POME", "enzyme_id": "CYP2C9", "relation_type": "inhibits", "strength": "moderate"},
+    {
+        "drug_id": "SUPP-POME",
+        "enzyme_id": "CYP3A4",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
+    {
+        "drug_id": "SUPP-POME",
+        "enzyme_id": "CYP2C9",
+        "relation_type": "inhibits",
+        "strength": "moderate",
+    },
 ]
 
 # ---------------------------------------------------------------------------

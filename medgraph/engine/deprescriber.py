@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import itertools
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import networkx as nx
 
@@ -100,9 +100,7 @@ class Deprescriber:
         enzyme_conflicts = self._build_cascade_conflict_lookup(resolved)
 
         # Compute base regimen score
-        base_score, base_count = self._score_regimen(
-            resolved, interaction_lookup, enzyme_conflicts
-        )
+        base_score, base_count = self._score_regimen(resolved, interaction_lookup, enzyme_conflicts)
 
         recommendations: list[DeprescribingRecommendation] = []
         for drug_id in resolved:
@@ -173,9 +171,7 @@ class Deprescriber:
                 count += 1
         return total, count
 
-    def _build_cascade_conflict_lookup(
-        self, drug_ids: list[str]
-    ) -> dict[frozenset, str]:
+    def _build_cascade_conflict_lookup(self, drug_ids: list[str]) -> dict[frozenset, str]:
         """
         Build pair → severity dict for enzyme cascade conflicts among drug_ids.
         Uses the same inhibitor/inducer/substrate patterns as ContraindicationNetwork.

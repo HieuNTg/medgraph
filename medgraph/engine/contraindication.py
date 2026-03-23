@@ -126,9 +126,7 @@ class ContraindicationNetwork:
             edges.extend(via_direct)
 
             # Check cascade paths via shared enzymes
-            cascade_edges = self._detect_cascade_conflicts(
-                drug_a_id, drug_b_id, enzyme_index
-            )
+            cascade_edges = self._detect_cascade_conflicts(drug_a_id, drug_b_id, enzyme_index)
             # Merge cascade edges that don't already have a direct entry at same severity
             direct_severities = {e.severity for e in via_direct}
             for ce in cascade_edges:
@@ -148,9 +146,7 @@ class ContraindicationNetwork:
     # Private helpers
     # -------------------------------------------------------------------------
 
-    def _build_enzyme_index(
-        self, drug_ids: list[str]
-    ) -> dict[str, dict[str, set[str]]]:
+    def _build_enzyme_index(self, drug_ids: list[str]) -> dict[str, dict[str, set[str]]]:
         """
         Build enzyme → {inhibitors, inducers, substrates} index from graph nodes.
         Only considers drugs in drug_ids.

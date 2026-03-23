@@ -30,6 +30,8 @@ Endpoints:
     POST /api/v1/share                                  — Share analysis result
     GET  /api/v1/shared/{token}                         — Get shared result (no auth)
     GET  /api/v1/audit                                  — Audit log (admin)
+
+    POST /api/v1/optimize                               — Optimize polypharmacy regimen
 """
 
 from __future__ import annotations
@@ -83,6 +85,8 @@ from medgraph.api.models import (
     LivenessResponse,
     JSONReportRequest,
     LoginRequest,
+    OptimizeRequest,
+    OptimizeResponse,
     PaginatedResponse,
     PathwayEdge,
     PathwayNode,
@@ -102,6 +106,7 @@ from medgraph.api.models import (
 from medgraph.api.search import DrugSearcher
 from medgraph.engine.analyzer import CascadeAnalyzer
 from medgraph.engine.explainer import explain_interaction, explain_report
+from medgraph.engine.optimizer import PolypharmacyOptimizer
 from medgraph.graph.builder import GraphBuilder
 from medgraph.graph.models import Drug
 from medgraph.graph.store import GraphStore
@@ -361,7 +366,12 @@ def create_app() -> FastAPI:
             data_version=info["data_version"],
         )
 
-    @router.get("/drugs/search", response_model=PaginatedResponse[SearchResult], tags=["drugs"], dependencies=_api_deps)
+    @router.get(
+        "/drugs/search",
+        response_model=PaginatedResponse[SearchResult],
+        tags=["drugs"],
+        dependencies=_api_deps,
+    )
     async def search_drugs(
         q: str = Query(..., min_length=1, description="Drug name search query"),
         limit: int = Query(10, ge=1, le=50),
@@ -387,7 +397,9 @@ def create_app() -> FastAPI:
             has_more=(offset + limit) < total,
         )
 
-    @router.get("/drugs/{drug_id}", response_model=DrugResponse, tags=["drugs"], dependencies=_api_deps)
+    @router.get(
+        "/drugs/{drug_id}", response_model=DrugResponse, tags=["drugs"], dependencies=_api_deps
+    )
     async def get_drug(drug_id: str) -> DrugResponse:
         store: GraphStore = app.state.store
         drug = store.get_drug_by_id(drug_id)
@@ -679,24 +691,28 @@ def create_app() -> FastAPI:
 
     try:
         from medgraph.engine.alternatives import AlternativesFinder
+
         _has_alternatives = True
     except ImportError:
         _has_alternatives = False
 
     try:
         from medgraph.engine.centrality import CentralityAnalyzer
+
         _has_centrality = True
     except ImportError:
         _has_centrality = False
 
     try:
         from medgraph.engine.contraindication import ContraindicationNetwork
+
         _has_contraindication = True
     except ImportError:
         _has_contraindication = False
 
     try:
         from medgraph.engine.deprescriber import Deprescriber
+
         _has_deprescriber = True
     except ImportError:
         _has_deprescriber = False
@@ -930,7 +946,9 @@ def create_app() -> FastAPI:
 
     # ── Profile Endpoints ─────────────────────────────────────────────────
 
-    @router.post("/profiles", response_model=ProfileResponse, tags=["profiles"], dependencies=_api_deps)
+    @router.post(
+        "/profiles", response_model=ProfileResponse, tags=["profiles"], dependencies=_api_deps
+    )
     async def create_profile(
         body: ProfileRequest,
         request: Request,
@@ -965,7 +983,9 @@ def create_app() -> FastAPI:
             updated_at=now,
         )
 
-    @router.get("/profiles", response_model=list[ProfileResponse], tags=["profiles"], dependencies=_api_deps)
+    @router.get(
+        "/profiles", response_model=list[ProfileResponse], tags=["profiles"], dependencies=_api_deps
+    )
     async def list_profiles(
         user: dict = Depends(require_current_user),
     ) -> list[ProfileResponse]:
@@ -973,7 +993,12 @@ def create_app() -> FastAPI:
         rows = store.get_profiles_by_user(user["id"])
         return [ProfileResponse(**r) for r in rows]
 
-    @router.get("/profiles/{profile_id}", response_model=ProfileResponse, tags=["profiles"], dependencies=_api_deps)
+    @router.get(
+        "/profiles/{profile_id}",
+        response_model=ProfileResponse,
+        tags=["profiles"],
+        dependencies=_api_deps,
+    )
     async def get_profile(
         profile_id: str,
         user: dict = Depends(require_current_user),
@@ -986,7 +1011,12 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=403, detail="Access denied")
         return ProfileResponse(**row)
 
-    @router.put("/profiles/{profile_id}", response_model=ProfileResponse, tags=["profiles"], dependencies=_api_deps)
+    @router.put(
+        "/profiles/{profile_id}",
+        response_model=ProfileResponse,
+        tags=["profiles"],
+        dependencies=_api_deps,
+    )
     async def update_profile(
         profile_id: str,
         body: ProfileRequest,
@@ -1008,7 +1038,13 @@ def create_app() -> FastAPI:
             notes=body.notes,
             updated_at=now,
         )
-        audit.log("profile.update", user_id=user["id"], resource_type="profile", resource_id=profile_id, ip_address=_client_ip(request))
+        audit.log(
+            "profile.update",
+            user_id=user["id"],
+            resource_type="profile",
+            resource_id=profile_id,
+            ip_address=_client_ip(request),
+        )
         return ProfileResponse(
             id=profile_id,
             name=body.name,
@@ -1032,12 +1068,23 @@ def create_app() -> FastAPI:
         if row["user_id"] != user["id"]:
             raise HTTPException(status_code=403, detail="Access denied")
         store.delete_profile(profile_id)
-        audit.log("profile.delete", user_id=user["id"], resource_type="profile", resource_id=profile_id, ip_address=_client_ip(request))
+        audit.log(
+            "profile.delete",
+            user_id=user["id"],
+            resource_type="profile",
+            resource_id=profile_id,
+            ip_address=_client_ip(request),
+        )
         return {"status": "deleted"}
 
     # ── History Endpoint ──────────────────────────────────────────────────
 
-    @router.get("/history", response_model=list[AnalysisHistoryResponse], tags=["analysis"], dependencies=_api_deps)
+    @router.get(
+        "/history",
+        response_model=list[AnalysisHistoryResponse],
+        tags=["analysis"],
+        dependencies=_api_deps,
+    )
     async def get_history(
         limit: int = Query(20, ge=1, le=100),
         offset: int = Query(0, ge=0),
@@ -1057,7 +1104,9 @@ def create_app() -> FastAPI:
 
     # ── Sharing Endpoints ─────────────────────────────────────────────────
 
-    @router.post("/share", response_model=SharedResultResponse, tags=["analysis"], dependencies=_api_deps)
+    @router.post(
+        "/share", response_model=SharedResultResponse, tags=["analysis"], dependencies=_api_deps
+    )
     async def share_analysis(
         analysis_id: str = Query(..., description="ID of analysis_history entry to share"),
         expires_days: int = Query(7, ge=1, le=30),
@@ -1111,9 +1160,79 @@ def create_app() -> FastAPI:
             },
         }
 
+    # ── Optimize Endpoint ─────────────────────────────────────────────────
+
+    @router.post(
+        "/optimize",
+        response_model=OptimizeResponse,
+        tags=["analysis"],
+        dependencies=_api_deps,
+    )
+    async def optimize_regimen(request: OptimizeRequest) -> OptimizeResponse:
+        """
+        Optimize a polypharmacy regimen by suggesting drug removals to reduce risk.
+
+        Accepts drug names and optional must-keep list. Returns original/optimized
+        risk scores, drugs to remove, alternatives, and rationale.
+        """
+        drug_names = request.drugs
+        if len(drug_names) < 2:
+            raise HTTPException(status_code=400, detail="At least 2 drugs required")
+        if len(drug_names) > 10:
+            raise HTTPException(status_code=400, detail="Maximum 10 drugs")
+
+        store: GraphStore = app.state.store
+        graph = app.state.graph
+        searcher: DrugSearcher = app.state.searcher
+
+        counts = store.get_counts()
+        if counts.get("drugs", 0) == 0:
+            raise HTTPException(
+                status_code=503,
+                detail="Database not seeded. Run 'python -m medgraph.cli seed' first.",
+            )
+
+        # Resolve drug names → IDs
+        found_drugs: list = []
+        unresolved: list[str] = []
+        for name in drug_names:
+            matches = searcher.search(name, limit=5)
+            if matches:
+                found_drugs.append(matches[0])
+            else:
+                unresolved.append(name)
+
+        if unresolved:
+            raise HTTPException(
+                status_code=400,
+                detail={"message": "Some drugs were not found", "unresolved": unresolved},
+            )
+
+        # Resolve must_keep names → IDs
+        must_keep_ids: list[str] = []
+        for name in request.must_keep:
+            matches = searcher.search(name, limit=5)
+            if matches:
+                must_keep_ids.append(matches[0].id)
+
+        drug_ids = [d.id for d in found_drugs]
+        optimizer = PolypharmacyOptimizer(graph, store)
+        result = optimizer.optimize(drug_ids, must_keep=must_keep_ids)
+
+        return OptimizeResponse(
+            original_risk=result.original_risk,
+            optimized_risk=result.optimized_risk,
+            drugs_to_remove=result.drugs_to_remove,
+            alternative_regimens=result.alternative_regimens,
+            rationale=result.rationale,
+            disclaimer=result.disclaimer,
+        )
+
     # ── Audit Endpoint ────────────────────────────────────────────────────
 
-    @router.get("/audit", response_model=list[AuditLogResponse], tags=["system"], dependencies=_api_deps)
+    @router.get(
+        "/audit", response_model=list[AuditLogResponse], tags=["system"], dependencies=_api_deps
+    )
     async def get_audit_log(
         user_id: Optional[str] = Query(None),
         action: Optional[str] = Query(None),
@@ -1144,7 +1263,7 @@ def create_app() -> FastAPI:
     try:
         from medgraph.fhir.cds_hooks import CDSHooksService
         from medgraph.fhir.capability import CapabilityStatement
-        from medgraph.fhir.models import CDSRequest, CDSResponse, OperationOutcome
+        from medgraph.fhir.models import CDSRequest, CDSResponse
         from medgraph.fhir.parser import FHIRParser
 
         fhir_router = APIRouter(tags=["fhir"])
@@ -1157,8 +1276,7 @@ def create_app() -> FastAPI:
             "/cds-services",
             summary="CDS Hooks discovery",
             description=(
-                "Returns available CDS Hooks service definitions. "
-                "FOR INFORMATIONAL PURPOSES ONLY."
+                "Returns available CDS Hooks service definitions. FOR INFORMATIONAL PURPOSES ONLY."
             ),
         )
         async def cds_services_discovery() -> dict:

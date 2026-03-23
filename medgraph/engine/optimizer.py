@@ -13,7 +13,6 @@ Usage:
 
 from __future__ import annotations
 
-import itertools
 import logging
 from dataclasses import dataclass, field
 
@@ -153,7 +152,8 @@ class PolypharmacyOptimizer:
 
         for removed_id in removed:
             alternatives = alternatives_finder.find_alternatives(
-                removed_id, drug_ids  # pass original regimen for context
+                removed_id,
+                drug_ids,  # pass original regimen for context
             )
             drug_obj = self.store.get_drug_by_id(removed_id)
             drug_name = drug_obj.name if drug_obj else removed_id

@@ -32,9 +32,7 @@ class RefreshResult:
     sources_succeeded: list[str] = field(default_factory=list)
     sources_failed: list[str] = field(default_factory=list)
     records_updated: int = 0
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     errors: dict[str, str] = field(default_factory=dict)
 
     @property

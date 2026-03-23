@@ -165,3 +165,12 @@ export interface AnalysisHistoryEntry {
   overall_risk: string;
   created_at: string;
 }
+
+export interface OptimizationResult {
+  original_risk: number;
+  optimized_risk: number;
+  drugs_to_remove: string[];
+  alternative_regimens: Record<string, unknown>[];
+  rationale: string;
+  disclaimer: string;
+}

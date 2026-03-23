@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Pill, Shield, Info, Sun, Moon, Menu, X, BookMarked, History, LogIn, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MedicalDisclaimer } from "@/components/medical-disclaimer";
+import { OfflineIndicator } from "@/components/offline-indicator";
 import { useAuth } from "@/lib/auth-context";
 
 function ThemeToggle() {
@@ -98,6 +99,7 @@ export function AppShell() {
 
             {/* Right: auth + theme + mobile menu */}
             <div className="flex items-center gap-2">
+              <OfflineIndicator />
               {isAuthenticated ? (
                 <div className="hidden md:flex items-center gap-2">
                   <span className="flex items-center gap-1.5 text-sm text-[var(--muted-foreground)]">

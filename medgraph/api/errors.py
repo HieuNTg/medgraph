@@ -63,8 +63,7 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
     if isinstance(exc, RequestValidationError):
         errors = exc.errors()
         detail = "; ".join(
-            f"{'.'.join(str(loc) for loc in e.get('loc', []))}: {e.get('msg', '')}"
-            for e in errors
+            f"{'.'.join(str(loc) for loc in e.get('loc', []))}: {e.get('msg', '')}" for e in errors
         )
     else:
         detail = str(exc)
