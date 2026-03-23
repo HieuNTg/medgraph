@@ -31,6 +31,7 @@ from medgraph import __version__
 from medgraph.api.models import (
     CheckRequest,
     CheckResponse,
+    CSVReportRequest,
     DrugResponse,
     EnzymeRelationResponse,
     EvidenceResponse,
@@ -38,6 +39,7 @@ from medgraph.api.models import (
     CascadeStepResponse,
     HealthResponse,
     InteractionResponse,
+    JSONReportRequest,
     PDFReportRequest,
     SearchResult,
     StatsResponse,
@@ -394,6 +396,39 @@ def create_app() -> FastAPI:
             media_type="application/pdf",
             headers={
                 "Content-Disposition": "attachment; filename=medgraph-report.pdf",
+            },
+        )
+
+    @app.post("/api/report/json", tags=["reports"])
+    async def generate_json_report(request: JSONReportRequest) -> Response:
+        """Generate a structured JSON report from check results."""
+        from medgraph.reports.json_generator import generate_report_json
+
+        json_str = generate_report_json(
+            check_result=request.check_result.model_dump(),
+            pretty=request.pretty,
+        )
+        return Response(
+            content=json_str,
+            media_type="application/json",
+            headers={
+                "Content-Disposition": "attachment; filename=medgraph-report.json",
+            },
+        )
+
+    @app.post("/api/report/csv", tags=["reports"])
+    async def generate_csv_report(request: CSVReportRequest) -> Response:
+        """Generate a CSV report of drug interactions."""
+        from medgraph.reports.csv_generator import generate_report_csv
+
+        csv_str = generate_report_csv(
+            check_result=request.check_result.model_dump(),
+        )
+        return Response(
+            content=csv_str,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=medgraph-report.csv",
             },
         )
 

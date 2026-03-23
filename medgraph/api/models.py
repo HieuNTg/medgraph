@@ -141,3 +141,12 @@ class PDFReportRequest(BaseModel):
         if v is not None and len(v) > _MAX_PNG_B64_LEN:
             raise ValueError(f"Graph image too large (max {_MAX_PNG_B64_LEN // (1024 * 1024)} MB)")
         return v
+
+
+class JSONReportRequest(BaseModel):
+    check_result: CheckResponse
+    pretty: bool = True
+
+
+class CSVReportRequest(BaseModel):
+    check_result: CheckResponse

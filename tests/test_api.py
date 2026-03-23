@@ -234,3 +234,68 @@ class TestHealth:
         assert data["status"] == "ok"
         assert "db_size" in data
         assert "graph_nodes" in data
+
+
+# ---------------------------------------------------------------------------
+# POST /api/report/json
+# ---------------------------------------------------------------------------
+
+
+class TestJSONReportEndpoint:
+    def _get_check_result(self, client: TestClient) -> dict:
+        resp = client.post("/api/check", json={"drugs": ["Warfarin", "Aspirin"]})
+        assert resp.status_code == 200
+        return resp.json()
+
+    def test_json_report_200(self, client: TestClient) -> None:
+        check = self._get_check_result(client)
+        resp = client.post("/api/report/json", json={"check_result": check})
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "application/json"
+        data = resp.json()
+        assert data["report_format"] == "medgraph-json-v1"
+        assert data["summary"]["drug_count"] == 2
+
+    def test_json_report_attachment_header(self, client: TestClient) -> None:
+        check = self._get_check_result(client)
+        resp = client.post("/api/report/json", json={"check_result": check})
+        assert "medgraph-report.json" in resp.headers.get("content-disposition", "")
+
+    def test_json_report_compact(self, client: TestClient) -> None:
+        check = self._get_check_result(client)
+        resp = client.post(
+            "/api/report/json", json={"check_result": check, "pretty": False}
+        )
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# POST /api/report/csv
+# ---------------------------------------------------------------------------
+
+
+class TestCSVReportEndpoint:
+    def _get_check_result(self, client: TestClient) -> dict:
+        resp = client.post("/api/check", json={"drugs": ["Warfarin", "Aspirin"]})
+        assert resp.status_code == 200
+        return resp.json()
+
+    def test_csv_report_200(self, client: TestClient) -> None:
+        check = self._get_check_result(client)
+        resp = client.post("/api/report/csv", json={"check_result": check})
+        assert resp.status_code == 200
+        assert "text/csv" in resp.headers["content-type"]
+
+    def test_csv_report_attachment_header(self, client: TestClient) -> None:
+        check = self._get_check_result(client)
+        resp = client.post("/api/report/csv", json={"check_result": check})
+        assert "medgraph-report.csv" in resp.headers.get("content-disposition", "")
+
+    def test_csv_report_has_data_rows(self, client: TestClient) -> None:
+        check = self._get_check_result(client)
+        resp = client.post("/api/report/csv", json={"check_result": check})
+        import csv
+        import io
+
+        rows = list(csv.reader(io.StringIO(resp.text)))
+        assert len(rows) >= 2  # header + interactions
