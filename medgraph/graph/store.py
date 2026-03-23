@@ -65,6 +65,67 @@ class GraphStore:
         """
         with self._connect() as conn:
             conn.executescript("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id            TEXT PRIMARY KEY,
+                    email         TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    display_name  TEXT,
+                    created_at    TEXT NOT NULL,
+                    last_login    TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS medication_profiles (
+                    id         TEXT PRIMARY KEY,
+                    user_id    TEXT NOT NULL REFERENCES users(id),
+                    name       TEXT NOT NULL,
+                    drug_ids   TEXT NOT NULL,
+                    notes      TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS analysis_history (
+                    id           TEXT PRIMARY KEY,
+                    user_id      TEXT REFERENCES users(id),
+                    drug_ids     TEXT NOT NULL,
+                    result_json  TEXT NOT NULL,
+                    overall_risk TEXT NOT NULL,
+                    created_at   TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS shared_results (
+                    id          TEXT PRIMARY KEY,
+                    analysis_id TEXT NOT NULL REFERENCES analysis_history(id),
+                    expires_at  TEXT,
+                    created_at  TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS audit_log (
+                    id            TEXT PRIMARY KEY,
+                    user_id       TEXT,
+                    action        TEXT NOT NULL,
+                    resource_type TEXT,
+                    resource_id   TEXT,
+                    ip_address    TEXT,
+                    user_agent    TEXT,
+                    created_at    TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_users_email
+                    ON users(email);
+                CREATE INDEX IF NOT EXISTS idx_profiles_user
+                    ON medication_profiles(user_id);
+                CREATE INDEX IF NOT EXISTS idx_history_user
+                    ON analysis_history(user_id);
+                CREATE INDEX IF NOT EXISTS idx_history_created
+                    ON analysis_history(created_at);
+                CREATE INDEX IF NOT EXISTS idx_shared_analysis
+                    ON shared_results(analysis_id);
+                CREATE INDEX IF NOT EXISTS idx_audit_user
+                    ON audit_log(user_id);
+                CREATE INDEX IF NOT EXISTS idx_audit_created
+                    ON audit_log(created_at);
+
                 CREATE TABLE IF NOT EXISTS drugs (
                     id          TEXT PRIMARY KEY,
                     name        TEXT NOT NULL,
@@ -506,6 +567,245 @@ class GraphStore:
             )
             for r in rows
         ]
+
+    # -------------------------------------------------------------------------
+    # Users
+    # -------------------------------------------------------------------------
+
+    def create_user(
+        self,
+        user_id: str,
+        email: str,
+        password_hash: str,
+        display_name: Optional[str],
+        created_at: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO users (id, email, password_hash, display_name, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (user_id, email, password_hash, display_name, created_at),
+            )
+
+    def get_user_by_id(self, user_id: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
+    def get_user_by_email(self, email: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM users WHERE email = ?", (email,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def update_user_login(self, user_id: str, last_login: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE users SET last_login = ? WHERE id = ?", (last_login, user_id)
+            )
+
+    # -------------------------------------------------------------------------
+    # Medication Profiles
+    # -------------------------------------------------------------------------
+
+    def create_profile(
+        self,
+        profile_id: str,
+        user_id: str,
+        name: str,
+        drug_ids: list[str],
+        notes: Optional[str],
+        created_at: str,
+        updated_at: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO medication_profiles
+                    (id, user_id, name, drug_ids, notes, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (profile_id, user_id, name, json.dumps(drug_ids), notes, created_at, updated_at),
+            )
+
+    def get_profiles_by_user(self, user_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM medication_profiles WHERE user_id = ? ORDER BY created_at DESC",
+                (user_id,),
+            ).fetchall()
+        return [self._row_to_profile(r) for r in rows]
+
+    def get_profile_by_id(self, profile_id: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM medication_profiles WHERE id = ?", (profile_id,)
+            ).fetchone()
+        return self._row_to_profile(row) if row else None
+
+    def update_profile(
+        self,
+        profile_id: str,
+        name: str,
+        drug_ids: list[str],
+        notes: Optional[str],
+        updated_at: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE medication_profiles
+                SET name = ?, drug_ids = ?, notes = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (name, json.dumps(drug_ids), notes, updated_at, profile_id),
+            )
+
+    def delete_profile(self, profile_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM medication_profiles WHERE id = ?", (profile_id,)
+            )
+
+    @staticmethod
+    def _row_to_profile(row: sqlite3.Row) -> dict:
+        d = dict(row)
+        d["drug_ids"] = json.loads(d["drug_ids"])
+        return d
+
+    # -------------------------------------------------------------------------
+    # Analysis History
+    # -------------------------------------------------------------------------
+
+    def save_analysis(
+        self,
+        analysis_id: str,
+        user_id: Optional[str],
+        drug_ids: list[str],
+        result_json: str,
+        overall_risk: str,
+        created_at: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO analysis_history
+                    (id, user_id, drug_ids, result_json, overall_risk, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (analysis_id, user_id, json.dumps(drug_ids), result_json, overall_risk, created_at),
+            )
+
+    def get_history_by_user(
+        self, user_id: str, limit: int = 20, offset: int = 0
+    ) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM analysis_history
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (user_id, limit, offset),
+            ).fetchall()
+        return [self._row_to_history(r) for r in rows]
+
+    def get_analysis_by_id(self, analysis_id: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM analysis_history WHERE id = ?", (analysis_id,)
+            ).fetchone()
+        return self._row_to_history(row) if row else None
+
+    @staticmethod
+    def _row_to_history(row: sqlite3.Row) -> dict:
+        d = dict(row)
+        d["drug_ids"] = json.loads(d["drug_ids"])
+        return d
+
+    # -------------------------------------------------------------------------
+    # Shared Results
+    # -------------------------------------------------------------------------
+
+    def create_shared_result(
+        self,
+        share_id: str,
+        analysis_id: str,
+        expires_at: Optional[str],
+        created_at: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO shared_results (id, analysis_id, expires_at, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (share_id, analysis_id, expires_at, created_at),
+            )
+
+    def get_shared_result(self, share_id: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM shared_results WHERE id = ?", (share_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    # -------------------------------------------------------------------------
+    # Audit Log
+    # -------------------------------------------------------------------------
+
+    def add_audit_log(
+        self,
+        log_id: str,
+        user_id: Optional[str],
+        action: str,
+        resource_type: Optional[str],
+        resource_id: Optional[str],
+        ip_address: Optional[str],
+        user_agent: Optional[str],
+        created_at: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO audit_log
+                    (id, user_id, action, resource_type, resource_id,
+                     ip_address, user_agent, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    log_id, user_id, action, resource_type, resource_id,
+                    ip_address, user_agent, created_at,
+                ),
+            )
+
+    def get_audit_logs(
+        self,
+        user_id: Optional[str] = None,
+        action: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict]:
+        conditions: list[str] = []
+        params: list = []
+        if user_id is not None:
+            conditions.append("user_id = ?")
+            params.append(user_id)
+        if action is not None:
+            conditions.append("action = ?")
+            params.append(action)
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        params.extend([limit, offset])
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM audit_log {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                params,
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     # -------------------------------------------------------------------------
     # Schema metadata

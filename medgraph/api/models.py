@@ -258,3 +258,70 @@ class ContraindicationResponse(BaseModel):
     nodes: list[dict]
     edges: list[dict]
     clusters: list[dict]
+
+
+# ── Auth / User Profile Models ────────────────────────────────────────────────
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    display_name: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    display_name: Optional[str]
+    created_at: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
+    user: UserResponse
+
+
+class ProfileRequest(BaseModel):
+    name: str
+    drug_ids: list[str]
+    notes: Optional[str] = None
+
+
+class ProfileResponse(BaseModel):
+    id: str
+    name: str
+    drug_ids: list[str]
+    notes: Optional[str]
+    created_at: str
+    updated_at: str
+
+
+class AnalysisHistoryResponse(BaseModel):
+    id: str
+    drug_ids: list[str]
+    overall_risk: str
+    created_at: str
+
+
+class SharedResultResponse(BaseModel):
+    id: str
+    url: str
+    expires_at: Optional[str]
+
+
+class AuditLogResponse(BaseModel):
+    id: str
+    action: str
+    resource_type: Optional[str]
+    resource_id: Optional[str]
+    created_at: str

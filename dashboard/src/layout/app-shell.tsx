@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
-import { Pill, Shield, Info, Sun, Moon, Menu, X } from "lucide-react";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Pill, Shield, Info, Sun, Moon, Menu, X, BookMarked, History, LogIn, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MedicalDisclaimer } from "@/components/medical-disclaimer";
+import { useAuth } from "@/lib/auth-context";
 
 function ThemeToggle() {
   const [dark, setDark] = useState(() => {
@@ -36,14 +37,21 @@ function ThemeToggle() {
   );
 }
 
-const NAV_LINKS = [
+const STATIC_NAV_LINKS = [
   { to: "/", label: "Home", icon: null, end: true },
   { to: "/checker", label: "Check Interactions", icon: Shield },
   { to: "/about", label: "About", icon: Info },
 ];
 
+const AUTH_NAV_LINKS = [
+  { to: "/profiles", label: "Profiles", icon: BookMarked },
+  { to: "/history", label: "History", icon: History },
+];
+
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -51,6 +59,16 @@ export function AppShell() {
         ? "bg-[var(--primary)] text-white"
         : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)]"
     }`;
+
+  const navLinks = isAuthenticated
+    ? [...STATIC_NAV_LINKS, ...AUTH_NAV_LINKS]
+    : STATIC_NAV_LINKS;
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+    setMobileOpen(false);
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--background)]">
@@ -71,15 +89,40 @@ export function AppShell() {
 
             {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-1">
-              {NAV_LINKS.map(({ to, label, end }) => (
+              {navLinks.map(({ to, label, end }) => (
                 <NavLink key={to} to={to} end={end} className={navLinkClass}>
                   {label}
                 </NavLink>
               ))}
             </nav>
 
-            {/* Right: theme toggle + mobile menu */}
+            {/* Right: auth + theme + mobile menu */}
             <div className="flex items-center gap-2">
+              {isAuthenticated ? (
+                <div className="hidden md:flex items-center gap-2">
+                  <span className="flex items-center gap-1.5 text-sm text-[var(--muted-foreground)]">
+                    <User className="h-3.5 w-3.5" />
+                    {user?.display_name ?? user?.email}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLogout}
+                    className="flex items-center gap-1.5 text-[var(--muted-foreground)]"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    Logout
+                  </Button>
+                </div>
+              ) : (
+                <NavLink
+                  to="/login"
+                  className="hidden md:flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Login
+                </NavLink>
+              )}
               <ThemeToggle />
               <button
                 className="md:hidden rounded-md p-2 hover:bg-[var(--accent)] transition-colors"
@@ -100,7 +143,7 @@ export function AppShell() {
         {mobileOpen && (
           <div className="md:hidden border-t border-[var(--border)] bg-[var(--background)] px-4 py-3">
             <nav className="flex flex-col gap-1">
-              {NAV_LINKS.map(({ to, label, icon: Icon, end }) => (
+              {navLinks.map(({ to, label, icon: Icon, end }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -112,6 +155,25 @@ export function AppShell() {
                   {label}
                 </NavLink>
               ))}
+              {isAuthenticated ? (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout ({user?.display_name ?? user?.email})
+                </button>
+              ) : (
+                <NavLink
+                  to="/login"
+                  className={navLinkClass}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <LogIn className="h-4 w-4" />
+                  Login
+                </NavLink>
+              )}
             </nav>
           </div>
         )}

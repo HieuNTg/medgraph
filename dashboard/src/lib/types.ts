@@ -133,3 +133,35 @@ export interface ContraindicationResponse {
   edges: ContraindicationEdge[];
   clusters: Record<string, unknown>[];
 }
+
+// ── Auth / Profile / History Types ───────────────────────────────────────────
+
+export interface User {
+  id: string;
+  email: string;
+  display_name: string | null;
+  created_at: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  user: User;
+}
+
+export interface MedicationProfile {
+  id: string;
+  name: string;
+  drug_ids: string[];
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnalysisHistoryEntry {
+  id: string;
+  drug_ids: string[];
+  overall_risk: string;
+  created_at: string;
+}

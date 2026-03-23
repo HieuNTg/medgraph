@@ -5,6 +5,7 @@ import { queryClient } from "@/lib/query-client";
 import { AppShell } from "@/layout/app-shell";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { AnalysisSkeleton } from "@/components/loading-skeleton";
+import { AuthProvider } from "@/lib/auth-context";
 import { HomePage } from "@/pages/home";
 import { CheckerPage } from "@/pages/checker";
 import { DrugInfoPage } from "@/pages/drug-info";
@@ -14,44 +15,94 @@ const ResultsPage = lazy(() =>
   import("@/pages/results").then((m) => ({ default: m.ResultsPage }))
 );
 
+const LoginPage = lazy(() =>
+  import("@/pages/login").then((m) => ({ default: m.LoginPage }))
+);
+
+const ProfilesPage = lazy(() =>
+  import("@/pages/profiles").then((m) => ({ default: m.ProfilesPage }))
+);
+
+const HistoryPage = lazy(() =>
+  import("@/pages/history").then((m) => ({ default: m.HistoryPage }))
+);
+
+const SharedResultPage = lazy(() =>
+  import("@/pages/shared-result").then((m) => ({ default: m.SharedResultPage }))
+);
+
 function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<AppShell />}>
-              <Route path="/" element={<HomePage />} />
-              <Route
-                path="/checker"
-                element={
-                  <ErrorBoundary>
-                    <CheckerPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/results"
-                element={
-                  <ErrorBoundary>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route element={<AppShell />}>
+                <Route path="/" element={<HomePage />} />
+                <Route
+                  path="/checker"
+                  element={
+                    <ErrorBoundary>
+                      <CheckerPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/results"
+                  element={
+                    <ErrorBoundary>
+                      <Suspense fallback={<AnalysisSkeleton />}>
+                        <ResultsPage />
+                      </Suspense>
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/drugs/:id"
+                  element={
+                    <ErrorBoundary>
+                      <DrugInfoPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route path="/about" element={<AboutPage />} />
+                <Route
+                  path="/login"
+                  element={
                     <Suspense fallback={<AnalysisSkeleton />}>
-                      <ResultsPage />
+                      <LoginPage />
                     </Suspense>
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="/drugs/:id"
-                element={
-                  <ErrorBoundary>
-                    <DrugInfoPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route path="/about" element={<AboutPage />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
+                  }
+                />
+                <Route
+                  path="/profiles"
+                  element={
+                    <Suspense fallback={<AnalysisSkeleton />}>
+                      <ProfilesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/history"
+                  element={
+                    <Suspense fallback={<AnalysisSkeleton />}>
+                      <HistoryPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/shared/:token"
+                  element={
+                    <Suspense fallback={<AnalysisSkeleton />}>
+                      <SharedResultPage />
+                    </Suspense>
+                  }
+                />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

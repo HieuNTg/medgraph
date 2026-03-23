@@ -14,23 +14,45 @@ Endpoints:
     GET  /api/v1/stats                                  — DB statistics (cached hourly)
     GET  /api/v1/data/freshness                         — Data freshness and version info
     GET  /api/v1/interactions/{interaction_id}/evidence  — Evidence for an interaction
+
+    POST /auth/register                                 — Register new user
+    POST /auth/login                                    — Login and receive JWT tokens
+    POST /auth/refresh                                  — Refresh access token
+    GET  /auth/me                                       — Get current user info
+
+    POST   /api/v1/profiles                             — Create medication profile
+    GET    /api/v1/profiles                             — List user profiles
+    GET    /api/v1/profiles/{profile_id}                — Get profile
+    PUT    /api/v1/profiles/{profile_id}                — Update profile
+    DELETE /api/v1/profiles/{profile_id}                — Delete profile
+
+    GET  /api/v1/history                                — Analysis history for user
+    POST /api/v1/share                                  — Share analysis result
+    GET  /api/v1/shared/{token}                         — Get shared result (no auth)
+    GET  /api/v1/audit                                  — Audit log (admin)
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import secrets
 import time
+import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from medgraph.api.audit import AuditLogger
 from medgraph.api.auth import check_rate_limit, verify_api_key
+from medgraph.api.user_auth import UserAuth
 from medgraph.api.errors import register_error_handlers
 from medgraph.api.metrics import ANALYSIS_DURATION, GRAPH_EDGES, GRAPH_NODES, setup_metrics
 from medgraph.api.middleware import RequestIDMiddleware
@@ -41,6 +63,10 @@ from medgraph.logging_config import configure_logging
 from medgraph.api.models import (
     AlternativeRequest,
     AlternativeResponse,
+    AnalysisHistoryResponse,
+    AuditLogResponse,
+    CascadePathResponse,
+    CascadeStepResponse,
     CheckRequest,
     CheckResponse,
     ContraindicationResponse,
@@ -51,21 +77,27 @@ from medgraph.api.models import (
     DrugResponse,
     EnzymeRelationResponse,
     EvidenceResponse,
-    CascadePathResponse,
-    CascadeStepResponse,
     HealthResponse,
     HubDrugResponse,
     InteractionResponse,
     LivenessResponse,
     JSONReportRequest,
+    LoginRequest,
     PaginatedResponse,
     PathwayEdge,
     PathwayNode,
     PathwayResponse,
     PDFReportRequest,
     PGxAnnotation,
+    ProfileRequest,
+    ProfileResponse,
+    RefreshRequest,
+    RegisterRequest,
     SearchResult,
+    SharedResultResponse,
     StatsResponse,
+    TokenResponse,
+    UserResponse,
 )
 from medgraph.api.search import DrugSearcher
 from medgraph.engine.analyzer import CascadeAnalyzer
@@ -101,11 +133,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     analyzer = CascadeAnalyzer()
     searcher = DrugSearcher(store, use_rxnorm=False)
 
+    secret_key = os.environ.get("MEDGRAPH_JWT_SECRET", "medgraph-dev-secret")
+    user_auth = UserAuth(store, secret_key=secret_key)
+    audit_logger = AuditLogger(store)
+
     app.state.store = store
     app.state.graph = graph
     app.state.analyzer = analyzer
     app.state.searcher = searcher
     app.state.stats_cache = (None, 0.0)
+    app.state.user_auth = user_auth
+    app.state.audit_logger = audit_logger
 
     counts = store.get_counts()
     # Set Prometheus gauges
@@ -212,7 +250,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Api-Key", "X-Request-ID"],
         expose_headers=["X-Request-ID"],
     )
@@ -251,6 +289,32 @@ def create_app() -> FastAPI:
     async def health() -> HealthResponse:
         """Backward-compatible alias for /health/ready."""
         return await health_ready()
+
+    # ── Auth Dependency ───────────────────────────────────────────────────
+    _bearer = HTTPBearer(auto_error=False)
+
+    def get_current_user(
+        credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+    ) -> Optional[dict]:
+        """Extract and verify JWT from Authorization header. Returns user dict or None."""
+        if credentials is None:
+            return None
+        _user_auth: UserAuth = app.state.user_auth
+        payload = _user_auth.verify_token(credentials.credentials)
+        if not payload or payload.get("type") != "access":
+            return None
+        return _user_auth.get_user(payload["sub"])
+
+    def require_current_user(
+        user: Optional[dict] = Depends(get_current_user),
+    ) -> dict:
+        """Like get_current_user but raises 401 if not authenticated."""
+        if user is None:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        return user
+
+    def _client_ip(request: Request) -> str:
+        return request.client.host if request.client else "unknown"
 
     # ── Versioned API Router ──────────────────────────────────────────────
     # All endpoints live on an APIRouter, mounted at both /api/v1 (canonical)
@@ -360,7 +424,11 @@ def create_app() -> FastAPI:
         return evidence
 
     @router.post("/check", response_model=CheckResponse, tags=["analysis"], dependencies=_api_deps)
-    async def check(request: CheckRequest) -> CheckResponse:
+    async def check(
+        request: CheckRequest,
+        http_request: Request,
+        current_user: Optional[dict] = Depends(get_current_user),
+    ) -> CheckResponse:
         """
         Analyze drug-drug interactions for a set of drugs.
 
@@ -511,7 +579,7 @@ def create_app() -> FastAPI:
                 )
             )
 
-        return CheckResponse(
+        check_response = CheckResponse(
             drugs=drugs_response,
             interactions=interactions_response,
             overall_risk=report.overall_risk,
@@ -522,6 +590,22 @@ def create_app() -> FastAPI:
             disclaimer=DISCLAIMER,
             summary=explain_report(report),
         )
+
+        # Auto-save to analysis history
+        try:
+            analysis_id = str(uuid.uuid4())
+            store.save_analysis(
+                analysis_id=analysis_id,
+                user_id=current_user["id"] if current_user else None,
+                drug_ids=drug_ids,
+                result_json=check_response.model_dump_json(),
+                overall_risk=report.overall_risk,
+                created_at=check_response.timestamp,
+            )
+        except Exception:
+            pass  # History save must not break primary analysis
+
+        return check_response
 
     @router.post("/report/pdf", tags=["reports"], dependencies=_api_deps)
     async def generate_pdf_report(request: PDFReportRequest) -> Response:
@@ -788,6 +872,267 @@ def create_app() -> FastAPI:
                 order=rec.order,
             )
             for rec in recs
+        ]
+
+    # ── Auth Router ───────────────────────────────────────────────────────
+    auth_router = APIRouter(prefix="/auth", tags=["auth"])
+
+    @auth_router.post("/register", response_model=TokenResponse)
+    async def register(request: Request, body: RegisterRequest) -> TokenResponse:
+        user_auth: UserAuth = app.state.user_auth
+        audit: AuditLogger = app.state.audit_logger
+        try:
+            result = user_auth.register(body.email, body.password, body.display_name)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        audit.log(
+            "user.register",
+            user_id=result["user"]["id"],
+            resource_type="user",
+            resource_id=result["user"]["id"],
+            ip_address=_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
+        )
+        return TokenResponse(**result)
+
+    @auth_router.post("/login", response_model=TokenResponse)
+    async def login(request: Request, body: LoginRequest) -> TokenResponse:
+        user_auth: UserAuth = app.state.user_auth
+        audit: AuditLogger = app.state.audit_logger
+        try:
+            result = user_auth.login(body.email, body.password)
+        except ValueError as exc:
+            raise HTTPException(status_code=401, detail=str(exc))
+        audit.log(
+            "user.login",
+            user_id=result["user"]["id"],
+            resource_type="user",
+            resource_id=result["user"]["id"],
+            ip_address=_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
+        )
+        return TokenResponse(**result)
+
+    @auth_router.post("/refresh", response_model=TokenResponse)
+    async def refresh_token(body: RefreshRequest) -> TokenResponse:
+        user_auth: UserAuth = app.state.user_auth
+        try:
+            result = user_auth.refresh(body.refresh_token)
+        except ValueError as exc:
+            raise HTTPException(status_code=401, detail=str(exc))
+        return TokenResponse(**result)
+
+    @auth_router.get("/me", response_model=UserResponse)
+    async def get_me(user: dict = Depends(require_current_user)) -> UserResponse:
+        return UserResponse(**user)
+
+    app.include_router(auth_router)
+
+    # ── Profile Endpoints ─────────────────────────────────────────────────
+
+    @router.post("/profiles", response_model=ProfileResponse, tags=["profiles"], dependencies=_api_deps)
+    async def create_profile(
+        body: ProfileRequest,
+        request: Request,
+        user: dict = Depends(require_current_user),
+    ) -> ProfileResponse:
+        store: GraphStore = app.state.store
+        audit: AuditLogger = app.state.audit_logger
+        now = datetime.now(timezone.utc).isoformat()
+        profile_id = str(uuid.uuid4())
+        store.create_profile(
+            profile_id=profile_id,
+            user_id=user["id"],
+            name=body.name,
+            drug_ids=body.drug_ids,
+            notes=body.notes,
+            created_at=now,
+            updated_at=now,
+        )
+        audit.log(
+            "profile.create",
+            user_id=user["id"],
+            resource_type="profile",
+            resource_id=profile_id,
+            ip_address=_client_ip(request),
+        )
+        return ProfileResponse(
+            id=profile_id,
+            name=body.name,
+            drug_ids=body.drug_ids,
+            notes=body.notes,
+            created_at=now,
+            updated_at=now,
+        )
+
+    @router.get("/profiles", response_model=list[ProfileResponse], tags=["profiles"], dependencies=_api_deps)
+    async def list_profiles(
+        user: dict = Depends(require_current_user),
+    ) -> list[ProfileResponse]:
+        store: GraphStore = app.state.store
+        rows = store.get_profiles_by_user(user["id"])
+        return [ProfileResponse(**r) for r in rows]
+
+    @router.get("/profiles/{profile_id}", response_model=ProfileResponse, tags=["profiles"], dependencies=_api_deps)
+    async def get_profile(
+        profile_id: str,
+        user: dict = Depends(require_current_user),
+    ) -> ProfileResponse:
+        store: GraphStore = app.state.store
+        row = store.get_profile_by_id(profile_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        if row["user_id"] != user["id"]:
+            raise HTTPException(status_code=403, detail="Access denied")
+        return ProfileResponse(**row)
+
+    @router.put("/profiles/{profile_id}", response_model=ProfileResponse, tags=["profiles"], dependencies=_api_deps)
+    async def update_profile(
+        profile_id: str,
+        body: ProfileRequest,
+        request: Request,
+        user: dict = Depends(require_current_user),
+    ) -> ProfileResponse:
+        store: GraphStore = app.state.store
+        audit: AuditLogger = app.state.audit_logger
+        row = store.get_profile_by_id(profile_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        if row["user_id"] != user["id"]:
+            raise HTTPException(status_code=403, detail="Access denied")
+        now = datetime.now(timezone.utc).isoformat()
+        store.update_profile(
+            profile_id=profile_id,
+            name=body.name,
+            drug_ids=body.drug_ids,
+            notes=body.notes,
+            updated_at=now,
+        )
+        audit.log("profile.update", user_id=user["id"], resource_type="profile", resource_id=profile_id, ip_address=_client_ip(request))
+        return ProfileResponse(
+            id=profile_id,
+            name=body.name,
+            drug_ids=body.drug_ids,
+            notes=body.notes,
+            created_at=row["created_at"],
+            updated_at=now,
+        )
+
+    @router.delete("/profiles/{profile_id}", tags=["profiles"], dependencies=_api_deps)
+    async def delete_profile(
+        profile_id: str,
+        request: Request,
+        user: dict = Depends(require_current_user),
+    ) -> dict:
+        store: GraphStore = app.state.store
+        audit: AuditLogger = app.state.audit_logger
+        row = store.get_profile_by_id(profile_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        if row["user_id"] != user["id"]:
+            raise HTTPException(status_code=403, detail="Access denied")
+        store.delete_profile(profile_id)
+        audit.log("profile.delete", user_id=user["id"], resource_type="profile", resource_id=profile_id, ip_address=_client_ip(request))
+        return {"status": "deleted"}
+
+    # ── History Endpoint ──────────────────────────────────────────────────
+
+    @router.get("/history", response_model=list[AnalysisHistoryResponse], tags=["analysis"], dependencies=_api_deps)
+    async def get_history(
+        limit: int = Query(20, ge=1, le=100),
+        offset: int = Query(0, ge=0),
+        user: dict = Depends(require_current_user),
+    ) -> list[AnalysisHistoryResponse]:
+        store: GraphStore = app.state.store
+        rows = store.get_history_by_user(user["id"], limit=limit, offset=offset)
+        return [
+            AnalysisHistoryResponse(
+                id=r["id"],
+                drug_ids=r["drug_ids"],
+                overall_risk=r["overall_risk"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    # ── Sharing Endpoints ─────────────────────────────────────────────────
+
+    @router.post("/share", response_model=SharedResultResponse, tags=["analysis"], dependencies=_api_deps)
+    async def share_analysis(
+        analysis_id: str = Query(..., description="ID of analysis_history entry to share"),
+        expires_days: int = Query(7, ge=1, le=30),
+        request: Request = None,
+        user: Optional[dict] = Depends(get_current_user),
+    ) -> SharedResultResponse:
+        store: GraphStore = app.state.store
+        row = store.get_analysis_by_id(analysis_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        if row.get("user_id") and (user is None or row["user_id"] != user["id"]):
+            raise HTTPException(status_code=403, detail="Access denied")
+        share_id = secrets.token_urlsafe(32)
+        now = datetime.now(timezone.utc)
+        expires_at = (now + timedelta(days=expires_days)).isoformat()
+        store.create_shared_result(
+            share_id=share_id,
+            analysis_id=analysis_id,
+            expires_at=expires_at,
+            created_at=now.isoformat(),
+        )
+        base_url = os.environ.get("MEDGRAPH_BASE_URL", "http://localhost:8000")
+        return SharedResultResponse(
+            id=share_id,
+            url=f"{base_url}/api/v1/shared/{share_id}",
+            expires_at=expires_at,
+        )
+
+    @router.get("/shared/{token}", tags=["analysis"])
+    async def get_shared(token: str) -> dict:
+        """Retrieve a shared analysis result. No authentication required."""
+        store: GraphStore = app.state.store
+        share = store.get_shared_result(token)
+        if not share:
+            raise HTTPException(status_code=404, detail="Shared result not found")
+        if share.get("expires_at"):
+            if share["expires_at"] < datetime.now(timezone.utc).isoformat():
+                raise HTTPException(status_code=410, detail="Shared result has expired")
+        analysis = store.get_analysis_by_id(share["analysis_id"])
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analysis data not found")
+        return {
+            "id": share["id"],
+            "expires_at": share["expires_at"],
+            "analysis": {
+                "id": analysis["id"],
+                "drug_ids": analysis["drug_ids"],
+                "overall_risk": analysis["overall_risk"],
+                "created_at": analysis["created_at"],
+                "result": json.loads(analysis["result_json"]),
+            },
+        }
+
+    # ── Audit Endpoint ────────────────────────────────────────────────────
+
+    @router.get("/audit", response_model=list[AuditLogResponse], tags=["system"], dependencies=_api_deps)
+    async def get_audit_log(
+        user_id: Optional[str] = Query(None),
+        action: Optional[str] = Query(None),
+        limit: int = Query(50, ge=1, le=200),
+        offset: int = Query(0, ge=0),
+        _user: dict = Depends(require_current_user),
+    ) -> list[AuditLogResponse]:
+        """Return audit log entries. Requires authentication."""
+        store: GraphStore = app.state.store
+        rows = store.get_audit_logs(user_id=user_id, action=action, limit=limit, offset=offset)
+        return [
+            AuditLogResponse(
+                id=r["id"],
+                action=r["action"],
+                resource_type=r.get("resource_type"),
+                resource_id=r.get("resource_id"),
+                created_at=r["created_at"],
+            )
+            for r in rows
         ]
 
     # Mount router at /api/v1 (canonical) and /api (backward compat)
