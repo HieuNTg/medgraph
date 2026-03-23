@@ -1,7 +1,7 @@
 # MEDGRAPH Documentation Index
 
-**Last Updated**: 2026-03-23 (Phase 2 Complete)
-**Status**: Production-Ready
+**Last Updated**: 2026-03-23 (Phase 3 Complete)
+**Status**: Production-Ready with Observability
 
 ---
 
@@ -10,7 +10,8 @@
 1. **New to MEDGRAPH?** → Read [project-overview-pdr.md](#project-overview-pdr)
 2. **Setting up locally?** → Read [deployment-guide.md](#deployment-guide)
 3. **Building on the API?** → Read [api-hardening-phase2.md](#api-hardening-phase2)
-4. **Contributing code?** → Read [code-standards.md](#code-standards)
+4. **Monitoring & observability?** → Read [PHASE3-OBSERVABILITY.md](#phase3-observability)
+5. **Contributing code?** → Read [code-standards.md](#code-standards)
 
 ---
 
@@ -105,6 +106,28 @@
 - Phase 3 roadmap
 
 **When to Read**: Phase completion review, stakeholder communication, planning
+
+---
+
+### PHASE3-OBSERVABILITY.md
+**What**: Phase 3 observability & monitoring implementation guide
+**Length**: ~420 lines
+**Audience**: DevOps engineers, monitoring teams, platform engineers, backend developers
+**Key Sections**:
+- Prometheus metrics setup (/metrics endpoint)
+- Custom app metrics (analysis duration, graph size)
+- Health check endpoints (liveness, readiness, backward compat)
+- Structured JSON logging with request_id tracing
+- Optional Sentry error tracking (SENTRY_DSN gated)
+- Architecture diagram with observability stack
+- Environment variables (logging, traces, Sentry)
+- Docker Compose deployment example
+- Testing overview (14 new observability tests)
+- Files changed (metrics, middleware, models, logging)
+- Breaking changes (none — fully backward compatible)
+- Next steps (alerting, dashboards, log aggregation)
+
+**When to Read**: Setting up monitoring, configuring observability stack, deploying to production
 
 ---
 
@@ -205,10 +228,13 @@
 **Start here**: deployment-guide.md → system-architecture.md → codebase-summary.md
 
 ### QA / Tester
-**Start here**: PHASE2-SUMMARY.md (test section) → api-hardening-phase2.md (testing) → code-standards.md
+**Start here**: PHASE2-SUMMARY.md (test section) → PHASE3-OBSERVABILITY.md (test section) → code-standards.md
 
 ### Architect
 **Start here**: system-architecture.md → project-roadmap.md → logic-diagrams.md
+
+### Site Reliability Engineer (SRE)
+**Start here**: PHASE3-OBSERVABILITY.md → deployment-guide.md → system-architecture.md
 
 ### New Team Member
 **Start here**:
@@ -216,6 +242,7 @@
 2. system-architecture.md (understand the system)
 3. codebase-summary.md (find your way around)
 4. code-standards.md (how we work)
+5. PHASE3-OBSERVABILITY.md (operations and monitoring)
 
 ---
 
@@ -227,7 +254,7 @@
 - PHASE2-SUMMARY.md — Quick endpoint reference
 
 ### Architecture & Design
-- system-architecture.md — System design
+- system-architecture.md — System design (including Phase 3 observability)
 - logic-diagrams.md — Analysis algorithms
 - design-guidelines.md — UI/UX design
 
@@ -240,11 +267,18 @@
 - deployment-guide.md — Setup and deployment
 - project-roadmap.md — Versions and support
 - system-architecture.md — Infrastructure
+- PHASE3-OBSERVABILITY.md — Monitoring and observability stack
+
+### Observability & Monitoring
+- PHASE3-OBSERVABILITY.md — Complete Phase 3 guide
+- system-architecture.md#phase-3-observability-monitoring — Architecture overview
+- codebase-summary.md — Metrics module documentation
 
 ### Business & Planning
 - project-overview-pdr.md — Product definition
 - project-roadmap.md — Roadmap and priorities
-- PHASE2-SUMMARY.md — Completion status
+- PHASE2-SUMMARY.md — Phase 2 completion status
+- PHASE3-OBSERVABILITY.md — Phase 3 completion status
 
 ---
 
@@ -261,6 +295,12 @@ Versioning, error standardization, pagination, request tracing. See:
 - [api-hardening-phase2.md](./api-hardening-phase2.md)
 - [PHASE2-SUMMARY.md](./PHASE2-SUMMARY.md#what-changed-in-phase-2)
 
+### Phase 3 Observability & Monitoring
+Prometheus metrics, structured logging, health checks, Sentry integration. See:
+- [PHASE3-OBSERVABILITY.md](./PHASE3-OBSERVABILITY.md)
+- [system-architecture.md#phase-3-observability--monitoring](./system-architecture.md#phase-3-observability--monitoring)
+- [codebase-summary.md#phase-3-features](./codebase-summary.md#phase-3-features)
+
 ### RFC 7807 Problem Details
 Standard error response format. See:
 - [api-hardening-phase2.md#2-rfc-7807-problem-details-errors](./api-hardening-phase2.md#2-rfc-7807-problem-details-errors)
@@ -268,6 +308,18 @@ Standard error response format. See:
 ### Pagination
 Offset-based result pagination. See:
 - [api-hardening-phase2.md#4-paginated-search-responses](./api-hardening-phase2.md#4-paginated-search-responses)
+
+### Health Checks (K8s-Compatible)
+Liveness and readiness probes. See:
+- [PHASE3-OBSERVABILITY.md#2-health-check-endpoints-kubernetes-compatible](./PHASE3-OBSERVABILITY.md#2-health-check-endpoints-kubernetes-compatible)
+
+### Prometheus Metrics
+Application and request metrics. See:
+- [PHASE3-OBSERVABILITY.md#1-prometheus-metrics](./PHASE3-OBSERVABILITY.md#1-prometheus-metrics)
+
+### Structured Logging with Request Tracing
+JSON logging with request_id correlation. See:
+- [PHASE3-OBSERVABILITY.md#3-structured-logging-with-request-tracing](./PHASE3-OBSERVABILITY.md#3-structured-logging-with-request-tracing)
 
 ### CPIC Pharmacogenomics
 Gene-specific drug dosing guidelines. See:
@@ -287,10 +339,19 @@ Gene-specific drug dosing guidelines. See:
 → [codebase-summary.md](./codebase-summary.md#backend-package-medgraph) (backend) or [codebase-summary.md](./codebase-summary.md#frontend-dashboardsrc) (frontend)
 
 ### Finding Environment Variables
-→ [deployment-guide.md](./deployment-guide.md#environment-variables)
+→ [deployment-guide.md](./deployment-guide.md#environment-variables) or [PHASE3-OBSERVABILITY.md](./PHASE3-OBSERVABILITY.md#environment-variables-phase-3)
 
 ### Finding Error Codes
 → [api-hardening-phase2.md](./api-hardening-phase2.md#2-rfc-7807-problem-details-errors)
+
+### Finding Monitoring Setup
+→ [PHASE3-OBSERVABILITY.md](./PHASE3-OBSERVABILITY.md) (complete guide) or [PHASE3-OBSERVABILITY.md](./PHASE3-OBSERVABILITY.md#deployment-example) (Docker example)
+
+### Finding Health Check Info
+→ [PHASE3-OBSERVABILITY.md](./PHASE3-OBSERVABILITY.md#2-health-check-endpoints-kubernetes-compatible)
+
+### Finding Metrics Info
+→ [PHASE3-OBSERVABILITY.md](./PHASE3-OBSERVABILITY.md#1-prometheus-metrics)
 
 ### Finding Scoring Logic
 → [logic-diagrams.md](./logic-diagrams.md#risk-scoring-algorithm)
@@ -302,16 +363,18 @@ Gene-specific drug dosing guidelines. See:
 | Document | Size | Updated | Audience |
 |----------|------|---------|----------|
 | project-overview-pdr.md | ~50 L | 2026-03-23 | Stakeholders |
-| system-architecture.md | ~95 L | 2026-03-23 | Architects |
-| codebase-summary.md | ~140 L | 2026-03-23 | Developers |
+| system-architecture.md | ~130 L | 2026-03-23 | Architects |
+| codebase-summary.md | ~160 L | 2026-03-23 | Developers |
 | api-hardening-phase2.md | ~280 L | 2026-03-23 | Integrators |
 | PHASE2-SUMMARY.md | ~380 L | 2026-03-23 | Leaders |
+| **PHASE3-OBSERVABILITY.md** | **~420 L** | **2026-03-23** | **SREs / DevOps** |
 | code-standards.md | ~100 L | 2025-Q4 | All devs |
 | design-guidelines.md | ~130 L | 2025-Q4 | Designers |
 | deployment-guide.md | ~140 L | 2025-Q4 | DevOps |
-| project-roadmap.md | ~90 L | 2025-Q4 | PMs |
+| project-roadmap.md | ~110 L | 2026-03-23 | PMs |
 | logic-diagrams.md | ~650 L | 2025-Q3 | Engineers |
-| **INDEX.md** | ~400 L | 2026-03-23 | Everyone |
+| **INDEX.md** | **~450 L** | **2026-03-23** | **Everyone** |
+| **Total** | **~2,700 L** | — | — |
 
 ---
 
@@ -339,10 +402,10 @@ When adding or updating docs:
 
 ## Document Version
 
-**Current Phase**: 2 (API Hardening Complete)
-**Total Docs**: 11 (including INDEX)
-**Last Updated**: 2026-03-23 16:52 UTC
-**Status**: Production Ready
+**Current Phase**: 3 (Observability & Monitoring Complete)
+**Total Docs**: 12 (including INDEX)
+**Last Updated**: 2026-03-23 17:00 UTC
+**Status**: Production Ready with Observability
 
 ---
 

@@ -1,8 +1,9 @@
 # MEDGRAPH — Project Roadmap
 
-## v0.1.0 — MVP (current)
+## v0.1.0 — MVP + Phase 2-3 Hardening & Observability (current)
 **Status**: Released
 
+**Phase 1 — Core**:
 - 89 built-in drugs across major therapeutic classes
 - 28 curated drug-drug interactions with severity ratings
 - 8 CYP450 enzymes with metabolizer / inhibitor / inducer relationships
@@ -14,6 +15,33 @@
 - Medical disclaimer, WCAG AA target
 - Docker + docker-compose support
 - GitHub Actions CI (lint, test, build)
+
+**Phase 2 — API Hardening**:
+- RFC 7807 Problem Details error format
+- Request ID tracing (X-Request-ID header)
+- Paginated search endpoints
+- API key verification + rate limiting
+- Security headers (CSP, HSTS, X-Frame-Options)
+- OpenAPI metadata (tags, contact, license info)
+- 17 new hardening tests
+
+**Phase 3 — Observability & Monitoring**:
+- Prometheus metrics (/metrics endpoint)
+- Custom app metrics: analysis duration, graph size
+- Structured JSON logging with request_id injection
+- Health check split (liveness /health/live, readiness /health/ready)
+- Optional Sentry error tracking (SENTRY_DSN gated)
+- K8s-compatible health checks (Docker + docker-compose updated)
+- 14 new observability tests
+
+**Phase 4 — Database & Data Scale**:
+- Alembic migration framework (SQLite baseline + versioning)
+- Data expansion: 507 drugs (5.7x from 89), 179 interactions, 469 enzyme relations
+- Backup/restore CLI commands (`db backup`, `db restore`)
+- Schema version tracking via metadata table
+- Health endpoint includes schema_version
+- 20 new tests (266 total passing)
+- All code review fixes applied (H1-H2, M1-M3, L1-L3)
 
 ---
 

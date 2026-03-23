@@ -21,11 +21,21 @@ make install
 ```
 
 ### 2. Seed the database
+
+**Base seed (89 drugs, 28 interactions):**
 ```bash
 python -m medgraph.cli seed
-# creates data/medgraph.db with 89 drugs, 28 interactions, 8 enzymes
+# creates data/medgraph.db with base dataset
 ```
 
+**Expanded seed (507 drugs, 243 interactions, 182 enzyme relations):**
+```bash
+python -m medgraph.cli seed
+python -m medgraph.cli expand
+# adds 297 additional drugs from Flockhart CYP450 + DDInter
+```
+
+Or via Makefile:
 ```bash
 make seed
 ```
@@ -90,6 +100,55 @@ See `Dockerfile` and `docker-compose.yml` at project root.
 
 ---
 
+## Phase 4: Migrations & Backups
+
+### Running Database Migrations
+
+MEDGRAPH uses Alembic for schema versioning. The baseline migration (`001_baseline_schema.py`) captures all tables from Phases 1–3 and adds schema_metadata for version tracking.
+
+**Apply migrations on startup** (recommended for production):
+```bash
+python -m medgraph.cli db upgrade
+# Applies all pending migrations up to 'head'
+```
+
+**Check current migration status**:
+```bash
+python -m medgraph.cli db status
+# Output: Current migration revision: 001
+```
+
+**Downgrade to previous revision**:
+```bash
+python -m medgraph.cli db downgrade
+# Reverts one migration step
+```
+
+### Database Backups
+
+Create online backups without stopping the server:
+
+```bash
+# Auto-timestamped backup
+python -m medgraph.cli db backup
+# Output: Backup created: data/backups/medgraph-20260323-191700.db
+
+# Custom output path
+python -m medgraph.cli db backup --output /path/to/backup.db
+```
+
+Restore from backup:
+```bash
+python -m medgraph.cli db restore /path/to/backup.db
+# Overwrites current DB with backup data
+```
+
+### Environment Variables (Phase 4)
+
+No new env vars for Phase 4; existing `MEDGRAPH_DB_PATH` controls migration location.
+
+---
+
 ## Environment Variables
 
 Copy `.env.example` to `.env` and edit as needed:
@@ -111,7 +170,11 @@ Copy `.env.example` to `.env` and edit as needed:
 | Task | Command |
 |------|---------|
 | Initial seed | `python -m medgraph.cli seed` |
-| Backup | `cp data/medgraph.db data/medgraph.db.bak` |
+| Expand data | `python -m medgraph.cli expand` (adds 297 drugs, 182 enzyme relations) |
+| Apply migrations | `python -m medgraph.cli db upgrade` |
+| Check migration status | `python -m medgraph.cli db status` |
+| Backup (online) | `python -m medgraph.cli db backup [--output path]` |
+| Restore from backup | `python -m medgraph.cli db restore <backup_file>` |
 | Reset | `rm data/medgraph.db && python -m medgraph.cli seed` |
 | DrugBank import | `python -m medgraph.data.drugbank <path/to/drugbank.csv>` |
 
@@ -119,11 +182,28 @@ Copy `.env.example` to `.env` and edit as needed:
 
 ## Monitoring
 
-Health endpoint returns HTTP 200 with JSON when the server is up and the DB is accessible:
-
+**Liveness Check** (process responding, no DB check):
 ```bash
-curl http://localhost:8000/health
-# {"status":"ok","db_size":145,"graph_nodes":97}
+curl http://localhost:8000/health/live
+# {"status":"ok"}
 ```
 
-Use this URL for load-balancer health checks or uptime monitors.
+**Readiness Check** (DB accessible, graph loaded, schema verified):
+```bash
+curl http://localhost:8000/health/ready
+# {"status":"ok","db_size":145,"graph_nodes":97,"schema_version":"001"}
+```
+
+**Backward Compatibility** (alias for readiness):
+```bash
+curl http://localhost:8000/health
+# {"status":"ok","db_size":145,"graph_nodes":97,"schema_version":"001"}
+```
+
+Use `/health/live` for liveness probes and `/health/ready` for readiness probes in Kubernetes; use `/health` for simple uptime monitors.
+
+**Prometheus Metrics**:
+```bash
+curl http://localhost:8000/metrics
+# Exposes Prometheus-format metrics (analysis duration, graph size, request counts)
+```
