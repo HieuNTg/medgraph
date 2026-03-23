@@ -191,3 +191,70 @@ class JSONReportRequest(BaseModel):
 
 class CSVReportRequest(BaseModel):
     check_result: CheckResponse
+
+
+# ── Graph / Advanced Analysis Models ─────────────────────────────────────────
+
+class PathwayNode(BaseModel):
+    id: str
+    type: str  # "drug" | "enzyme"
+    label: str
+
+
+class PathwayEdge(BaseModel):
+    source: str
+    target: str
+    relation: str
+    strength: Optional[str] = None
+
+
+class PathwayResponse(BaseModel):
+    nodes: list[PathwayNode]
+    edges: list[PathwayEdge]
+    cascades: list[dict]
+
+
+class AlternativeRequest(BaseModel):
+    drug_id: str
+    regimen: list[str]
+
+
+class AlternativeResponse(BaseModel):
+    drug_id: str
+    drug_name: str
+    reason: str
+    enzyme_overlap_count: int
+
+
+class HubDrugResponse(BaseModel):
+    drug_id: str
+    drug_name: str
+    betweenness: float
+    pagerank: float
+    interaction_count: int
+
+
+class DeprescribeRequest(BaseModel):
+    drugs: list[str]
+
+
+class DeprescribingResponse(BaseModel):
+    drug_id: str
+    drug_name: str
+    removal_benefit: float
+    interactions_resolved: int
+    rationale: str
+    order: int
+
+
+class PolypharmacyResponse(BaseModel):
+    polypharmacy_score: float
+    risk_level: str
+    risk_clusters: list[dict]
+    summary: str
+
+
+class ContraindicationResponse(BaseModel):
+    nodes: list[dict]
+    edges: list[dict]
+    clusters: list[dict]

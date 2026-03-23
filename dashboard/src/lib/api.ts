@@ -1,4 +1,13 @@
-import type { CheckResponse, Drug, SearchResult } from "./types";
+import type {
+  AlternativeResponse,
+  CheckResponse,
+  ContraindicationResponse,
+  DeprescribingResponse,
+  Drug,
+  HubDrugResponse,
+  PathwayResponse,
+  SearchResult,
+} from "./types";
 
 const API_BASE = "";
 
@@ -41,6 +50,43 @@ export function getStats(): Promise<{
   enzyme_count: number;
 }> {
   return apiFetch("/api/stats");
+}
+
+export function getAlternatives(
+  drugId: string,
+  regimen: string[]
+): Promise<AlternativeResponse[]> {
+  return apiFetch("/api/alternatives", {
+    method: "POST",
+    body: JSON.stringify({ drug_id: drugId, regimen }),
+  });
+}
+
+export function getPathways(drugIds: string[]): Promise<PathwayResponse> {
+  return apiFetch(
+    `/api/v1/graph/pathways?drugs=${drugIds.map(encodeURIComponent).join(",")}`
+  );
+}
+
+export function getHubDrugs(topN = 20): Promise<HubDrugResponse[]> {
+  return apiFetch(`/api/v1/graph/hub-drugs?top_n=${topN}`);
+}
+
+export function getContraindications(
+  drugIds: string[]
+): Promise<ContraindicationResponse> {
+  return apiFetch(
+    `/api/v1/graph/contraindications?drugs=${drugIds.map(encodeURIComponent).join(",")}`
+  );
+}
+
+export function getDeprescribingRecs(
+  drugs: string[]
+): Promise<DeprescribingResponse[]> {
+  return apiFetch("/api/deprescribe", {
+    method: "POST",
+    body: JSON.stringify({ drugs }),
+  });
 }
 
 export async function exportPdfReport(

@@ -1,12 +1,37 @@
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, RotateCcw, Network, FileDown, Loader2, Dna } from "lucide-react";
+import {
+  ArrowLeft,
+  RotateCcw,
+  Network,
+  FileDown,
+  Loader2,
+  Dna,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RiskSummary } from "@/components/risk-summary";
 import { InteractionCard } from "@/components/interaction-card";
 import { InteractionGraph } from "@/components/interaction-graph";
-import type { CheckResponse, InteractionResult } from "@/lib/types";
-import { exportPdfReport } from "@/lib/api";
+import { PathwayGraph } from "@/components/pathway-graph";
+import { ContraindicationMatrix } from "@/components/contraindication-matrix";
+import { DeprescribingPanel } from "@/components/deprescribing-panel";
+import { PolypharmacyGauge } from "@/components/polypharmacy-gauge";
+import type {
+  CheckResponse,
+  ContraindicationResponse,
+  DeprescribingResponse,
+  InteractionResult,
+  PathwayResponse,
+  PolypharmacyResponse,
+} from "@/lib/types";
+import {
+  exportPdfReport,
+  getPathways,
+  getContraindications,
+  getDeprescribingRecs,
+} from "@/lib/api";
 
 const SEVERITY_ORDER: Record<string, number> = {
   critical: 0,
@@ -27,6 +52,56 @@ interface ResultsState {
   metabolizerPhenotypes?: Record<string, string>;
 }
 
+/** Collapsible section wrapper. */
+function CollapsibleSection({
+  title,
+  icon,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+      <button
+        onClick={() => setOpen((p) => !p)}
+        className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-[var(--secondary)] transition-colors"
+        aria-expanded={open}
+      >
+        <span className="font-semibold text-[var(--foreground)] flex items-center gap-2 text-sm">
+          {icon}
+          {title}
+        </span>
+        {open ? (
+          <ChevronUp className="h-4 w-4 text-[var(--muted-foreground)]" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-[var(--muted-foreground)]" />
+        )}
+      </button>
+      {open && <div className="px-5 pb-5 pt-2">{children}</div>}
+    </div>
+  );
+}
+
+/** Derive a naive polypharmacy score from the check response. */
+function derivePolypharmacyData(result: CheckResponse): PolypharmacyResponse {
+  const score = Math.min(result.overall_score * 100, 100);
+  const risk_level =
+    score < 35 ? "low" : score < 60 ? "moderate" : score < 80 ? "high" : "critical";
+  return {
+    polypharmacy_score: score,
+    risk_level,
+    risk_clusters: [],
+    summary: result.interaction_count > 0
+      ? `${result.interaction_count} interaction${result.interaction_count !== 1 ? "s" : ""} detected across ${result.drug_count} drug${result.drug_count !== 1 ? "s" : ""}.`
+      : "No significant interactions detected.",
+  };
+}
+
 export function ResultsPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -35,6 +110,24 @@ export function ResultsPage() {
   const graphContainerRef = useRef<HTMLDivElement>(null);
   const [graphWidth, setGraphWidth] = useState(700);
   const [exporting, setExporting] = useState(false);
+
+  // Graph / advanced data state
+  const [pathwayData, setPathwayData] = useState<PathwayResponse | null>(null);
+  const [contraindicationData, setContraindicationData] =
+    useState<ContraindicationResponse | null>(null);
+  const [deprescribingData, setDeprescribingData] = useState<
+    DeprescribingResponse[]
+  >([]);
+  const [pathwayError, setPathwayError] = useState<string | null>(null);
+  const [contraindicationError, setContraindicationError] = useState<
+    string | null
+  >(null);
+  const [deprescribingError, setDeprescribingError] = useState<string | null>(
+    null
+  );
+  const [pathwayLoading, setPathwayLoading] = useState(false);
+  const [contraindicationLoading, setContraindicationLoading] = useState(false);
+  const [deprescribingLoading, setDeprescribingLoading] = useState(false);
 
   useEffect(() => {
     if (!state?.result) {
@@ -55,6 +148,44 @@ export function ResultsPage() {
     return () => observer.disconnect();
   }, []);
 
+  // Fetch advanced graph data once we have drug IDs
+  useEffect(() => {
+    if (!state?.result?.drugs?.length) return;
+    const ids = state.result.drugs.map((d) => d.id);
+    if (!ids.length) return;
+
+    // Pathway data
+    setPathwayLoading(true);
+    getPathways(ids)
+      .then(setPathwayData)
+      .catch((e: unknown) =>
+        setPathwayError(e instanceof Error ? e.message : "Failed to load pathways")
+      )
+      .finally(() => setPathwayLoading(false));
+
+    // Contraindication matrix
+    setContraindicationLoading(true);
+    getContraindications(ids)
+      .then(setContraindicationData)
+      .catch((e: unknown) =>
+        setContraindicationError(
+          e instanceof Error ? e.message : "Failed to load contraindications"
+        )
+      )
+      .finally(() => setContraindicationLoading(false));
+
+    // Deprescribing
+    setDeprescribingLoading(true);
+    getDeprescribingRecs(ids)
+      .then(setDeprescribingData)
+      .catch((e: unknown) =>
+        setDeprescribingError(
+          e instanceof Error ? e.message : "Failed to load deprescribing data"
+        )
+      )
+      .finally(() => setDeprescribingLoading(false));
+  }, [state?.result]);
+
   if (!state?.result) return null;
 
   const { result, metabolizerPhenotypes } = state;
@@ -62,13 +193,11 @@ export function ResultsPage() {
   const handleExportPdf = async () => {
     setExporting(true);
     try {
-      // Capture graph as PNG if visible
       let graphPng: string | undefined;
       const canvas = graphContainerRef.current?.querySelector("canvas");
       if (canvas && showGraph) {
         graphPng = canvas.toDataURL("image/png").replace("data:image/png;base64,", "");
       }
-
       const blob = await exportPdfReport(result, graphPng);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -84,12 +213,13 @@ export function ResultsPage() {
       setExporting(false);
     }
   };
-  const sorted = sortBySeverity(result.interactions);
 
-  // Check if graph has meaningful data to show
+  const sorted = sortBySeverity(result.interactions);
   const hasGraphData =
     result.drugs.some((d) => d.enzyme_relations.length > 0) ||
     result.interactions.some((i) => i.cascade_paths.length > 0);
+
+  const polypharmacyData = derivePolypharmacyData(result);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
@@ -105,6 +235,9 @@ export function ResultsPage() {
 
       {/* Risk summary */}
       <RiskSummary response={result} />
+
+      {/* Polypharmacy gauge */}
+      <PolypharmacyGauge data={polypharmacyData} />
 
       {/* Knowledge Graph Visualization */}
       {hasGraphData && (
@@ -124,11 +257,7 @@ export function ResultsPage() {
           </div>
           {showGraph && (
             <div ref={graphContainerRef}>
-              <InteractionGraph
-                data={result}
-                width={graphWidth}
-                height={450}
-              />
+              <InteractionGraph data={result} width={graphWidth} height={450} />
               <p className="text-xs text-[var(--muted-foreground)] mt-2">
                 Drag nodes to rearrange. Scroll to zoom. Blue circles = drugs,
                 amber rectangles = enzymes.
@@ -136,6 +265,27 @@ export function ResultsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Metabolic Pathway Graph */}
+      {(pathwayData || pathwayLoading) && (
+        <CollapsibleSection
+          title="Metabolic Pathway Graph"
+          icon={<Network className="h-4 w-4 text-[var(--primary)]" />}
+          defaultOpen={false}
+        >
+          {pathwayLoading && (
+            <p className="text-sm text-[var(--muted-foreground)] animate-pulse py-4 text-center">
+              Loading pathway data…
+            </p>
+          )}
+          {pathwayError && (
+            <p className="text-sm text-red-500 py-4 text-center">{pathwayError}</p>
+          )}
+          {pathwayData && !pathwayLoading && (
+            <PathwayGraph data={pathwayData} width={graphWidth || 600} height={380} />
+          )}
+        </CollapsibleSection>
       )}
 
       {/* Drug list */}
@@ -173,6 +323,29 @@ export function ResultsPage() {
         </div>
       )}
 
+      {/* Contraindication Matrix */}
+      <CollapsibleSection
+        title="Contraindication Matrix"
+        defaultOpen={false}
+      >
+        {contraindicationLoading && (
+          <p className="text-sm text-[var(--muted-foreground)] animate-pulse py-4 text-center">
+            Loading contraindication data…
+          </p>
+        )}
+        {contraindicationError && (
+          <p className="text-sm text-red-500 py-4 text-center">{contraindicationError}</p>
+        )}
+        {contraindicationData && !contraindicationLoading && (
+          <ContraindicationMatrix data={contraindicationData} />
+        )}
+        {!contraindicationData && !contraindicationLoading && !contraindicationError && (
+          <p className="text-sm text-[var(--muted-foreground)] py-4 text-center">
+            No contraindication data available
+          </p>
+        )}
+      </CollapsibleSection>
+
       {/* Interaction cards */}
       {sorted.length > 0 ? (
         <div className="space-y-4">
@@ -196,6 +369,18 @@ export function ResultsPage() {
         </div>
       )}
 
+      {/* Deprescribing Panel */}
+      <CollapsibleSection
+        title="Deprescribing Recommendations"
+        defaultOpen={false}
+      >
+        <DeprescribingPanel
+          recommendations={deprescribingData}
+          loading={deprescribingLoading}
+          error={deprescribingError}
+        />
+      </CollapsibleSection>
+
       {/* Actions */}
       <div className="flex gap-3">
         <Button asChild variant="outline">
@@ -213,7 +398,7 @@ export function ResultsPage() {
           {exporting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Generating PDF...
+              Generating PDF…
             </>
           ) : (
             <>

@@ -39,20 +39,29 @@ from medgraph.api.security import SecurityHeadersMiddleware
 from medgraph import __version__
 from medgraph.logging_config import configure_logging
 from medgraph.api.models import (
+    AlternativeRequest,
+    AlternativeResponse,
     CheckRequest,
     CheckResponse,
+    ContraindicationResponse,
     CSVReportRequest,
     DataFreshnessResponse,
+    DeprescribeRequest,
+    DeprescribingResponse,
     DrugResponse,
     EnzymeRelationResponse,
     EvidenceResponse,
     CascadePathResponse,
     CascadeStepResponse,
     HealthResponse,
+    HubDrugResponse,
     InteractionResponse,
     LivenessResponse,
     JSONReportRequest,
     PaginatedResponse,
+    PathwayEdge,
+    PathwayNode,
+    PathwayResponse,
     PDFReportRequest,
     PGxAnnotation,
     SearchResult,
@@ -579,6 +588,206 @@ def create_app() -> FastAPI:
                 "severity_multiplier": gl.severity_multiplier,
             }
             for gl in guidelines
+        ]
+
+    # ── Graph & Advanced Analysis Endpoints ──────────────────────────────────
+    # Engine modules are provided by another agent; import with graceful fallback.
+
+    try:
+        from medgraph.engine.alternatives import AlternativesFinder
+        _has_alternatives = True
+    except ImportError:
+        _has_alternatives = False
+
+    try:
+        from medgraph.engine.centrality import CentralityAnalyzer
+        _has_centrality = True
+    except ImportError:
+        _has_centrality = False
+
+    try:
+        from medgraph.engine.contraindication import ContraindicationNetwork
+        _has_contraindication = True
+    except ImportError:
+        _has_contraindication = False
+
+    try:
+        from medgraph.engine.deprescriber import Deprescriber
+        _has_deprescriber = True
+    except ImportError:
+        _has_deprescriber = False
+
+    @router.post(
+        "/alternatives",
+        response_model=list[AlternativeResponse],
+        tags=["analysis"],
+        dependencies=_api_deps,
+    )
+    async def get_alternatives(request: AlternativeRequest) -> list[AlternativeResponse]:
+        """Find alternative drugs with fewer interactions for the given regimen."""
+        if not _has_alternatives:
+            raise HTTPException(status_code=503, detail="Alternatives engine not available")
+        store: GraphStore = app.state.store
+        graph = app.state.graph
+        finder = AlternativesFinder(graph, store)
+        results = finder.find_alternatives(request.drug_id, request.regimen)
+        return [
+            AlternativeResponse(
+                drug_id=alt.drug_id,
+                drug_name=alt.drug_name,
+                reason=alt.reason,
+                enzyme_overlap_count=alt.enzyme_overlap_count,
+            )
+            for alt in results
+        ]
+
+    @router.get(
+        "/graph/pathways",
+        response_model=PathwayResponse,
+        tags=["analysis"],
+        dependencies=_api_deps,
+    )
+    async def get_pathways(
+        drugs: str = Query(..., description="Comma-separated drug IDs"),
+    ) -> PathwayResponse:
+        """Return metabolic pathway graph for a set of drug IDs."""
+        drug_ids = [d.strip() for d in drugs.split(",") if d.strip()]
+        if not drug_ids:
+            raise HTTPException(status_code=400, detail="No drug IDs provided")
+
+        store: GraphStore = app.state.store
+        graph = app.state.graph
+
+        nodes: dict[str, PathwayNode] = {}
+        edges: list[PathwayEdge] = []
+        cascades: list[dict] = []
+
+        enzymes_by_id = {e.id: e for e in store.get_all_enzymes()}
+
+        for drug_id in drug_ids:
+            drug = store.get_drug_by_id(drug_id)
+            if not drug:
+                continue
+            nodes[drug_id] = PathwayNode(id=drug_id, type="drug", label=drug.name)
+            for rel in store.get_enzyme_relations(drug_id):
+                enz_id = rel.enzyme_id
+                if enz_id not in nodes:
+                    enz_label = enzymes_by_id[enz_id].name if enz_id in enzymes_by_id else enz_id
+                    nodes[enz_id] = PathwayNode(id=enz_id, type="enzyme", label=enz_label)
+                edges.append(
+                    PathwayEdge(
+                        source=drug_id,
+                        target=enz_id,
+                        relation=rel.relation_type,
+                        strength=rel.strength,
+                    )
+                )
+
+        # Collect cascade interactions between the supplied drugs
+        if len(drug_ids) >= 2:
+            cascade_analyzer: CascadeAnalyzer = app.state.analyzer
+            report = cascade_analyzer.analyze(drug_ids, graph, store)
+            for interaction in report.interactions:
+                for cp in interaction.cascade_paths:
+                    cascades.append(
+                        {
+                            "description": cp.description,
+                            "net_severity": cp.net_severity,
+                            "steps": [
+                                {
+                                    "source": step.source_drug,
+                                    "target": step.target,
+                                    "relation": step.relation,
+                                    "effect": step.effect,
+                                }
+                                for step in cp.steps
+                            ],
+                        }
+                    )
+
+        return PathwayResponse(
+            nodes=list(nodes.values()),
+            edges=edges,
+            cascades=cascades,
+        )
+
+    @router.get(
+        "/graph/hub-drugs",
+        response_model=list[HubDrugResponse],
+        tags=["analysis"],
+        dependencies=_api_deps,
+    )
+    async def get_hub_drugs(
+        top_n: int = Query(20, ge=1, le=100, description="Number of top hub drugs to return"),
+    ) -> list[HubDrugResponse]:
+        """Return top hub drugs ranked by centrality metrics."""
+        if not _has_centrality:
+            raise HTTPException(status_code=503, detail="Centrality engine not available")
+        graph = app.state.graph
+        analyzer_obj = CentralityAnalyzer(graph)
+        hubs = analyzer_obj.hub_drugs(top_n)
+        return [
+            HubDrugResponse(
+                drug_id=h.drug_id,
+                drug_name=h.drug_name,
+                betweenness=h.betweenness,
+                pagerank=h.pagerank,
+                interaction_count=h.interaction_count,
+            )
+            for h in hubs
+        ]
+
+    @router.get(
+        "/graph/contraindications",
+        response_model=ContraindicationResponse,
+        tags=["analysis"],
+        dependencies=_api_deps,
+    )
+    async def get_contraindications(
+        drugs: str = Query(..., description="Comma-separated drug IDs"),
+    ) -> ContraindicationResponse:
+        """Return contraindication network for a set of drug IDs."""
+        if not _has_contraindication:
+            raise HTTPException(status_code=503, detail="Contraindication engine not available")
+        drug_ids = [d.strip() for d in drugs.split(",") if d.strip()]
+        if not drug_ids:
+            raise HTTPException(status_code=400, detail="No drug IDs provided")
+        graph = app.state.graph
+        store: GraphStore = app.state.store
+        network = ContraindicationNetwork(graph, store)
+        result = network.build_network(drug_ids)
+        return ContraindicationResponse(
+            nodes=result.get("nodes", []),
+            edges=result.get("edges", []),
+            clusters=result.get("clusters", []),
+        )
+
+    @router.post(
+        "/deprescribe",
+        response_model=list[DeprescribingResponse],
+        tags=["analysis"],
+        dependencies=_api_deps,
+    )
+    async def deprescribe(request: DeprescribeRequest) -> list[DeprescribingResponse]:
+        """Return ordered deprescribing recommendations for a drug regimen."""
+        if not _has_deprescriber:
+            raise HTTPException(status_code=503, detail="Deprescriber engine not available")
+        if not request.drugs:
+            raise HTTPException(status_code=400, detail="No drugs provided")
+        graph = app.state.graph
+        store: GraphStore = app.state.store
+        deprescriber = Deprescriber(graph, store)
+        recs = deprescriber.recommend(request.drugs)
+        return [
+            DeprescribingResponse(
+                drug_id=rec.drug_id,
+                drug_name=rec.drug_name,
+                removal_benefit=rec.removal_benefit,
+                interactions_resolved=rec.interactions_resolved,
+                rationale=rec.rationale,
+                order=rec.order,
+            )
+            for rec in recs
         ]
 
     # Mount router at /api/v1 (canonical) and /api (backward compat)

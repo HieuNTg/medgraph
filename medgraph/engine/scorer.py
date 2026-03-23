@@ -193,6 +193,95 @@ class RiskScorer:
         normalized = code.strip().upper()
         return _SEVERITY_CODE_MAP.get(normalized, code.strip().lower())
 
+    def score_polypharmacy(
+        self,
+        interactions: list,
+        cascades: list,
+    ) -> dict:
+        """
+        Score entire regimen topology for polypharmacy risk.
+
+        Args:
+            interactions: List of DrugInteractionResult objects from the analyzer.
+            cascades: List of CascadePath objects across all drug pairs.
+
+        Returns:
+            {
+                polypharmacy_score: float (0–100),
+                risk_level: str,
+                risk_clusters: list[dict],  # groups of drugs sharing enzyme conflicts
+                summary: str,
+            }
+        """
+        if not interactions:
+            return {
+                "polypharmacy_score": 0.0,
+                "risk_level": "minor",
+                "risk_clusters": [],
+                "summary": "No interactions to score.",
+            }
+
+        # --- Component 1: Interaction burden ---
+        total_interaction_count = len(interactions)
+        max_individual_score = max((r.risk_score for r in interactions), default=0.0)
+
+        # Burden penalty: each additional interaction adds diminishing risk
+        burden_score = min(30.0, total_interaction_count * 3.0)
+
+        # --- Component 2: Cascade depth ---
+        all_cascade_depths = [len(c.steps) for c in cascades]
+        max_cascade_depth = max(all_cascade_depths, default=0)
+        # Each additional hop = +5 pts, capped at 20
+        cascade_depth_score = min(20.0, max_cascade_depth * 5.0)
+
+        # --- Component 3: Shared enzyme count ---
+        all_enzymes: set[str] = set()
+        for c in cascades:
+            all_enzymes.update(c.enzyme_ids)
+        shared_enzyme_score = min(20.0, len(all_enzymes) * 4.0)
+
+        # --- Component 4: Severity amplifier ---
+        # Boost based on max individual score (most dangerous pair dominates)
+        severity_amplifier = max_individual_score * 0.3  # 30% of worst pair score
+
+        raw_score = burden_score + cascade_depth_score + shared_enzyme_score + severity_amplifier
+        polypharmacy_score = min(100.0, raw_score)
+        risk_level = self.classify_severity(polypharmacy_score)
+
+        # --- Risk clusters: groups of 3+ drugs sharing the same enzyme ---
+        enzyme_to_drugs: dict[str, set[str]] = {}
+        for c in cascades:
+            pair = frozenset([c.drug_a_name, c.drug_b_name])
+            for eid in c.enzyme_ids:
+                enzyme_to_drugs.setdefault(eid, set()).update(pair)
+
+        risk_clusters: list[dict] = []
+        for enzyme_id, drug_names in enzyme_to_drugs.items():
+            if len(drug_names) >= 3:
+                risk_clusters.append(
+                    {
+                        "enzyme": enzyme_id,
+                        "drugs": sorted(drug_names),
+                        "drug_count": len(drug_names),
+                    }
+                )
+        risk_clusters.sort(key=lambda c: c["drug_count"], reverse=True)
+
+        # --- Summary ---
+        summary = (
+            f"Regimen contains {total_interaction_count} interaction pair(s) "
+            f"across {len(all_enzymes)} shared enzyme(s). "
+            f"Maximum cascade depth: {max_cascade_depth} hop(s). "
+            f"Overall polypharmacy risk: {risk_level} ({polypharmacy_score:.1f}/100)."
+        )
+
+        return {
+            "polypharmacy_score": round(polypharmacy_score, 2),
+            "risk_level": risk_level,
+            "risk_clusters": risk_clusters,
+            "summary": summary,
+        }
+
     # -------------------------------------------------------------------------
     # Private helpers
     # -------------------------------------------------------------------------

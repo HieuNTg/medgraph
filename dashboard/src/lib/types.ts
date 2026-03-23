@@ -63,3 +63,73 @@ export interface SearchResult {
   brand_names: string[];
   drug_class: string | null;
 }
+
+// ── Graph / Advanced Analysis Types ──────────────────────────────────────────
+
+export interface PathwayNode {
+  id: string;
+  type: "drug" | "enzyme";
+  label: string;
+}
+
+export interface PathwayEdge {
+  source: string;
+  target: string;
+  relation: string;
+  strength: string | null;
+}
+
+export interface PathwayResponse {
+  nodes: PathwayNode[];
+  edges: PathwayEdge[];
+  cascades: Record<string, unknown>[];
+}
+
+export interface AlternativeResponse {
+  drug_id: string;
+  drug_name: string;
+  reason: string;
+  enzyme_overlap_count: number;
+}
+
+export interface HubDrugResponse {
+  drug_id: string;
+  drug_name: string;
+  betweenness: number;
+  pagerank: number;
+  interaction_count: number;
+}
+
+export interface DeprescribingResponse {
+  drug_id: string;
+  drug_name: string;
+  removal_benefit: number;
+  interactions_resolved: number;
+  rationale: string;
+  order: number;
+}
+
+export interface PolypharmacyResponse {
+  polypharmacy_score: number;
+  risk_level: string;
+  risk_clusters: Record<string, unknown>[];
+  summary: string;
+}
+
+export interface ContraindicationNode {
+  id: string;
+  label: string;
+}
+
+export interface ContraindicationEdge {
+  source: string;
+  target: string;
+  severity: string;
+  label?: string;
+}
+
+export interface ContraindicationResponse {
+  nodes: ContraindicationNode[];
+  edges: ContraindicationEdge[];
+  clusters: Record<string, unknown>[];
+}
