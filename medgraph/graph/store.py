@@ -37,6 +37,7 @@ class GraphStore:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.init_db()
+        self._ensure_schema_metadata()
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
@@ -55,7 +56,12 @@ class GraphStore:
             conn.close()
 
     def init_db(self) -> None:
-        """Create all tables and indexes if they don't exist."""
+        """Create all tables and indexes if they don't exist.
+
+        NOTE: For production, use Alembic migrations (medgraph/migrations/)
+        as the canonical DDL source. This method serves as a safe fallback
+        ensuring the app works without running migrations first.
+        """
         with self._connect() as conn:
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS drugs (
@@ -382,12 +388,18 @@ class GraphStore:
     def get_adverse_events(self, drug_ids: list[str]) -> list[AdverseEvent]:
         if not drug_ids:
             return []
+        # Pre-filter with LIKE to avoid full table scan, then verify in Python
+        like_clauses = " OR ".join(["drug_ids LIKE ?"] * len(drug_ids))
+        like_params = [f"%{did}%" for did in drug_ids]
         with self._connect() as conn:
-            rows = conn.execute("SELECT * FROM adverse_events").fetchall()
+            rows = conn.execute(
+                f"SELECT * FROM adverse_events WHERE {like_clauses}", like_params
+            ).fetchall()
+        drug_set = set(drug_ids)
         results = []
         for row in rows:
             ids = json.loads(row["drug_ids"])
-            if any(d in drug_ids for d in ids):
+            if drug_set.intersection(ids):
                 results.append(
                     AdverseEvent(
                         id=row["id"],
@@ -426,6 +438,75 @@ class GraphStore:
                 (drug_id,),
             ).fetchall()
         return [GeneticGuideline(**dict(r)) for r in rows]
+
+    # -------------------------------------------------------------------------
+    # Schema metadata
+    # -------------------------------------------------------------------------
+
+    def _ensure_schema_metadata(self) -> None:
+        """Create schema_metadata table if missing (for pre-migration DBs)."""
+        with self._connect() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS schema_metadata (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+
+    def get_schema_version(self) -> str:
+        """Return the current schema version string."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM schema_metadata WHERE key = 'schema_version'"
+            ).fetchone()
+        return row["value"] if row else "unknown"
+
+    def set_schema_version(self, version: str) -> None:
+        """Update the schema version in metadata."""
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_metadata (key, value) VALUES ('schema_version', ?)",
+                (version,),
+            )
+
+    # -------------------------------------------------------------------------
+    # Backup / Restore
+    # -------------------------------------------------------------------------
+
+    def backup(self, dest_path: Path | str) -> Path:
+        """Create a backup of the database using SQLite online backup API.
+
+        Returns the path to the backup file.
+        """
+        import sqlite3 as _sqlite3
+
+        dest = Path(dest_path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        src_conn = _sqlite3.connect(self.db_path)
+        dst_conn = _sqlite3.connect(dest)
+        try:
+            src_conn.backup(dst_conn)
+        finally:
+            dst_conn.close()
+            src_conn.close()
+        return dest
+
+    def restore(self, src_path: Path | str) -> None:
+        """Restore the database from a backup file using SQLite online backup API."""
+        import sqlite3 as _sqlite3
+
+        src = Path(src_path)
+        if not src.exists():
+            raise FileNotFoundError(f"Backup file not found: {src}")
+
+        src_conn = _sqlite3.connect(src)
+        dst_conn = _sqlite3.connect(self.db_path)
+        try:
+            src_conn.backup(dst_conn)
+        finally:
+            dst_conn.close()
+            src_conn.close()
 
     # -------------------------------------------------------------------------
     # Stats

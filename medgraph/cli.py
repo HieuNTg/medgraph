@@ -266,8 +266,7 @@ def expand(db: str) -> None:
     db_path = Path(db)
     store = GraphStore(db_path)
     seeder = DataSeeder(store=store, db_path=db_path)
-    seeder._seed_expanded_drugs()
-    seeder._seed_expanded_interactions()
+    seeder.seed_expanded()
     counts = seeder.store.get_counts()
     console.print("[bold green]Database expanded![/]")
     console.print(
@@ -275,6 +274,97 @@ def expand(db: str) -> None:
         f"Interactions: [cyan]{counts['interactions']}[/]  "
         f"Enzyme relations: [cyan]{counts['drug_enzyme_relations']}[/]"
     )
+
+
+@cli.group()
+def db() -> None:
+    """Database management commands (migrate, backup, restore)."""
+    pass
+
+
+@db.command()
+@click.option(
+    "--db-path", "db_path", default="data/medgraph.db", help="Database path", show_default=True
+)
+@click.option("--revision", default="head", help="Target revision", show_default=True)
+def upgrade(db_path: str, revision: str) -> None:
+    """Run database migrations up to the target revision."""
+    from medgraph.migrations.runner import upgrade as run_upgrade
+
+    console.print(f"[bold blue]MEDGRAPH[/] — running migrations to [cyan]{revision}[/]...")
+    run_upgrade(db_path=db_path, revision=revision)
+    console.print("[bold green]Migrations applied successfully.[/]")
+
+
+@db.command()
+@click.option(
+    "--db-path", "db_path", default="data/medgraph.db", help="Database path", show_default=True
+)
+@click.option("--revision", default="-1", help="Target revision", show_default=True)
+def downgrade(db_path: str, revision: str) -> None:
+    """Downgrade database by one revision (or to a specific revision)."""
+    from medgraph.migrations.runner import downgrade as run_downgrade
+
+    console.print(f"[bold blue]MEDGRAPH[/] — downgrading to [cyan]{revision}[/]...")
+    run_downgrade(db_path=db_path, revision=revision)
+    console.print("[bold green]Downgrade complete.[/]")
+
+
+@db.command()
+@click.option(
+    "--db-path", "db_path", default="data/medgraph.db", help="Database path", show_default=True
+)
+def status(db_path: str) -> None:
+    """Show current migration revision."""
+    from medgraph.migrations.runner import current
+
+    rev = current(db_path=db_path)
+    console.print(f"Current migration revision: [cyan]{rev or 'not stamped'}[/]")
+
+
+@db.command()
+@click.option(
+    "--db-path", "db_path", default="data/medgraph.db", help="Database path", show_default=True
+)
+@click.option(
+    "--output",
+    "-o",
+    default=None,
+    help="Output file path (default: data/backups/medgraph-<timestamp>.db)",
+)
+def backup(db_path: str, output: str | None) -> None:
+    """Create a backup of the database."""
+    from datetime import datetime
+
+    from medgraph.graph.store import GraphStore
+
+    store = GraphStore(Path(db_path))
+
+    if output is None:
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        output = f"data/backups/medgraph-{ts}.db"
+
+    dest = store.backup(output)
+    console.print(f"[bold green]Backup created:[/] {dest}")
+
+
+@db.command()
+@click.option(
+    "--db-path", "db_path", default="data/medgraph.db", help="Database path", show_default=True
+)
+@click.argument("backup_file")
+def restore(db_path: str, backup_file: str) -> None:
+    """Restore the database from a backup file."""
+    from medgraph.graph.store import GraphStore
+
+    backup_path = Path(backup_file)
+    if not backup_path.exists():
+        console.print(f"[red]Backup file not found:[/] {backup_path}")
+        sys.exit(1)
+
+    store = GraphStore(Path(db_path))
+    store.restore(backup_path)
+    console.print(f"[bold green]Database restored from:[/] {backup_path}")
 
 
 def main() -> None:

@@ -103,6 +103,15 @@ class DataSeeder:
             self._seed_expanded_interactions()
             progress.update(task, description="Expanded interactions seeded", completed=1, total=1)
 
+            # Step 2b: Extended drug data (Phase 4 expansion)
+            task = progress.add_task("Seeding extended drugs...", total=None)
+            self._seed_extended_drugs()
+            progress.update(task, description="Extended drugs seeded", completed=1, total=1)
+
+            task = progress.add_task("Seeding extended interactions...", total=None)
+            self._seed_extended_interactions()
+            progress.update(task, description="Extended interactions seeded", completed=1, total=1)
+
             task = progress.add_task("Seeding pharmacogenomics guidelines...", total=None)
             self._seed_pharmacogenomics()
             progress.update(
@@ -161,6 +170,13 @@ class DataSeeder:
         for e in sd.ADVERSE_EVENTS:
             self.store.upsert_adverse_event(AdverseEvent(**e))
 
+    def seed_expanded(self) -> None:
+        """Public method to seed expanded + extended drug data."""
+        self._seed_expanded_drugs()
+        self._seed_expanded_interactions()
+        self._seed_extended_drugs()
+        self._seed_extended_interactions()
+
     def _seed_expanded_drugs(self) -> None:
         try:
             from medgraph.data.seed_drugs_expanded import DRUGS_EXPANDED
@@ -184,6 +200,29 @@ class DataSeeder:
         except ImportError:
             logger.debug("seed_interactions_expanded not available — skipping")
 
+    def _seed_extended_drugs(self) -> None:
+        try:
+            from medgraph.data.seed_drugs_extended import DRUGS_EXTENDED
+
+            for d in DRUGS_EXTENDED:
+                self.store.upsert_drug(Drug(**d))
+        except ImportError:
+            logger.debug("seed_drugs_extended not available — skipping")
+
+    def _seed_extended_interactions(self) -> None:
+        try:
+            from medgraph.data.seed_interactions_extended import (
+                INTERACTIONS_EXTENDED,
+                DRUG_ENZYME_RELATIONS_EXTENDED,
+            )
+
+            for i in INTERACTIONS_EXTENDED:
+                self.store.upsert_interaction(Interaction(**i))
+            for r in DRUG_ENZYME_RELATIONS_EXTENDED:
+                self.store.upsert_drug_enzyme_relation(DrugEnzymeRelation(**r))
+        except ImportError:
+            logger.debug("seed_interactions_extended not available — skipping")
+
     def _seed_pharmacogenomics(self) -> None:
         try:
             from medgraph.data.seed_pharmacogenomics import GENETIC_GUIDELINES
@@ -192,7 +231,7 @@ class DataSeeder:
             for g in GENETIC_GUIDELINES:
                 self.store.upsert_genetic_guideline(GeneticGuideline(**g))
         except ImportError:
-            pass
+            logger.debug("seed_pharmacogenomics not available — skipping")
 
     def _seed_drugbank(self, parser: DrugBankParser, progress, task) -> None:
         """Seed from DrugBank CSV files."""

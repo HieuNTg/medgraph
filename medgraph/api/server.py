@@ -233,6 +233,7 @@ def create_app() -> FastAPI:
             status="ok",
             db_size=total,
             graph_nodes=graph.number_of_nodes(),
+            schema_version=store.get_schema_version(),
         )
 
     @app.get("/health", response_model=HealthResponse, tags=["system"])

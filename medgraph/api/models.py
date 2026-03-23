@@ -156,6 +156,7 @@ class HealthResponse(BaseModel):
     status: str
     db_size: int
     graph_nodes: int
+    schema_version: str = "unknown"
 
 
 class PDFReportRequest(BaseModel):
