@@ -30,6 +30,9 @@ class Drug(BaseModel):
     description: str = ""
     drug_class: Optional[str] = None
     rxnorm_cui: Optional[str] = None  # RxNorm concept ID for normalization
+    category: str = "prescription"  # "prescription" | "otc" | "supplement" | "food"
+    last_updated: Optional[str] = None
+    atc_code: Optional[str] = None
 
 
 class ActiveIngredient(BaseModel):
@@ -65,6 +68,23 @@ class Interaction(BaseModel):
     mechanism: Optional[str] = None
     source: str  # "drugbank" | "openfda" | "seed"
     evidence_count: int = 0  # FDA FAERS report count
+    evidence_level: str = "D"  # "A" | "B" | "C" | "D"
+    source_citation: Optional[str] = None
+    last_updated: Optional[str] = None
+    clinical_significance: Optional[str] = None
+
+
+class EvidenceSource(BaseModel):
+    """Supporting evidence source for a drug-drug interaction."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    interaction_id: str
+    source_type: str  # "fda_label" | "clinical_trial" | "case_report" | "in_vitro"
+    citation: str = ""
+    url: Optional[str] = None
+    year: Optional[int] = None
 
 
 class DrugEnzymeRelation(BaseModel):

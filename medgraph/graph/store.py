@@ -17,6 +17,7 @@ from medgraph.graph.models import (
     Drug,
     DrugEnzymeRelation,
     Enzyme,
+    EvidenceSource,
     GeneticGuideline,
     Interaction,
 )
@@ -70,7 +71,10 @@ class GraphStore:
                     brand_names TEXT NOT NULL DEFAULT '[]',
                     description TEXT NOT NULL DEFAULT '',
                     drug_class  TEXT,
-                    rxnorm_cui  TEXT
+                    rxnorm_cui  TEXT,
+                    category    TEXT NOT NULL DEFAULT 'prescription',
+                    last_updated TEXT,
+                    atc_code    TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS ingredients (
@@ -86,14 +90,27 @@ class GraphStore:
                 );
 
                 CREATE TABLE IF NOT EXISTS interactions (
+                    id                   TEXT PRIMARY KEY,
+                    drug_a_id            TEXT NOT NULL,
+                    drug_b_id            TEXT NOT NULL,
+                    severity             TEXT NOT NULL,
+                    description          TEXT NOT NULL DEFAULT '',
+                    mechanism            TEXT,
+                    source               TEXT NOT NULL DEFAULT 'seed',
+                    evidence_count       INTEGER NOT NULL DEFAULT 0,
+                    evidence_level       TEXT NOT NULL DEFAULT 'D',
+                    source_citation      TEXT,
+                    last_updated         TEXT,
+                    clinical_significance TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS evidence_sources (
                     id             TEXT PRIMARY KEY,
-                    drug_a_id      TEXT NOT NULL,
-                    drug_b_id      TEXT NOT NULL,
-                    severity       TEXT NOT NULL,
-                    description    TEXT NOT NULL DEFAULT '',
-                    mechanism      TEXT,
-                    source         TEXT NOT NULL DEFAULT 'seed',
-                    evidence_count INTEGER NOT NULL DEFAULT 0
+                    interaction_id TEXT NOT NULL REFERENCES interactions(id),
+                    source_type    TEXT NOT NULL,
+                    citation       TEXT NOT NULL DEFAULT '',
+                    url            TEXT,
+                    year           INTEGER
                 );
 
                 CREATE TABLE IF NOT EXISTS drug_enzyme_relations (
@@ -137,6 +154,8 @@ class GraphStore:
                     ON drug_enzyme_relations(drug_id);
                 CREATE INDEX IF NOT EXISTS idx_drug_enzyme_enzyme
                     ON drug_enzyme_relations(enzyme_id);
+                CREATE INDEX IF NOT EXISTS idx_evidence_sources_interaction
+                    ON evidence_sources(interaction_id);
             """)
 
     # -------------------------------------------------------------------------
@@ -147,14 +166,18 @@ class GraphStore:
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO drugs (id, name, brand_names, description, drug_class, rxnorm_cui)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO drugs (id, name, brand_names, description, drug_class, rxnorm_cui,
+                                   category, last_updated, atc_code)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
-                    name        = excluded.name,
-                    brand_names = excluded.brand_names,
-                    description = excluded.description,
-                    drug_class  = excluded.drug_class,
-                    rxnorm_cui  = excluded.rxnorm_cui
+                    name         = excluded.name,
+                    brand_names  = excluded.brand_names,
+                    description  = excluded.description,
+                    drug_class   = excluded.drug_class,
+                    rxnorm_cui   = excluded.rxnorm_cui,
+                    category     = excluded.category,
+                    last_updated = excluded.last_updated,
+                    atc_code     = excluded.atc_code
                 """,
                 (
                     drug.id,
@@ -163,6 +186,9 @@ class GraphStore:
                     drug.description,
                     drug.drug_class,
                     drug.rxnorm_cui,
+                    drug.category,
+                    drug.last_updated,
+                    drug.atc_code,
                 ),
             )
 
@@ -184,14 +210,20 @@ class GraphStore:
             conn.execute(
                 """
                 INSERT INTO interactions
-                    (id, drug_a_id, drug_b_id, severity, description, mechanism, source, evidence_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, drug_a_id, drug_b_id, severity, description, mechanism, source,
+                     evidence_count, evidence_level, source_citation, last_updated,
+                     clinical_significance)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
-                    severity       = excluded.severity,
-                    description    = excluded.description,
-                    mechanism      = excluded.mechanism,
-                    source         = excluded.source,
-                    evidence_count = excluded.evidence_count
+                    severity              = excluded.severity,
+                    description           = excluded.description,
+                    mechanism             = excluded.mechanism,
+                    source                = excluded.source,
+                    evidence_count        = excluded.evidence_count,
+                    evidence_level        = excluded.evidence_level,
+                    source_citation       = excluded.source_citation,
+                    last_updated          = excluded.last_updated,
+                    clinical_significance = excluded.clinical_significance
                 """,
                 (
                     interaction.id,
@@ -202,6 +234,10 @@ class GraphStore:
                     interaction.mechanism,
                     interaction.source,
                     interaction.evidence_count,
+                    interaction.evidence_level,
+                    interaction.source_citation,
+                    interaction.last_updated,
+                    interaction.clinical_significance,
                 ),
             )
 
@@ -237,6 +273,29 @@ class GraphStore:
                     event.count,
                     event.seriousness,
                     event.source_url,
+                ),
+            )
+
+    def upsert_evidence_source(self, source: EvidenceSource) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO evidence_sources (id, interaction_id, source_type, citation, url, year)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    interaction_id = excluded.interaction_id,
+                    source_type    = excluded.source_type,
+                    citation       = excluded.citation,
+                    url            = excluded.url,
+                    year           = excluded.year
+                """,
+                (
+                    source.id,
+                    source.interaction_id,
+                    source.source_type,
+                    source.citation,
+                    source.url,
+                    source.year,
                 ),
             )
 
@@ -319,16 +378,7 @@ class GraphStore:
             ).fetchone()
         if not row:
             return None
-        return Interaction(
-            id=row["id"],
-            drug_a_id=row["drug_a_id"],
-            drug_b_id=row["drug_b_id"],
-            severity=row["severity"],
-            description=row["description"],
-            mechanism=row["mechanism"],
-            source=row["source"],
-            evidence_count=row["evidence_count"],
-        )
+        return self._row_to_interaction(row)
 
     def get_all_drug_enzyme_relations(self) -> list[DrugEnzymeRelation]:
         with self._connect() as conn:
@@ -439,6 +489,24 @@ class GraphStore:
             ).fetchall()
         return [GeneticGuideline(**dict(r)) for r in rows]
 
+    def get_evidence_sources(self, interaction_id: str) -> list[EvidenceSource]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM evidence_sources WHERE interaction_id = ?",
+                (interaction_id,),
+            ).fetchall()
+        return [
+            EvidenceSource(
+                id=r["id"],
+                interaction_id=r["interaction_id"],
+                source_type=r["source_type"],
+                citation=r["citation"] or "",
+                url=r["url"],
+                year=r["year"],
+            )
+            for r in rows
+        ]
+
     # -------------------------------------------------------------------------
     # Schema metadata
     # -------------------------------------------------------------------------
@@ -530,6 +598,7 @@ class GraphStore:
 
     @staticmethod
     def _row_to_drug(row: sqlite3.Row) -> Drug:
+        keys = row.keys()
         return Drug(
             id=row["id"],
             name=row["name"],
@@ -537,10 +606,14 @@ class GraphStore:
             description=row["description"] or "",
             drug_class=row["drug_class"],
             rxnorm_cui=row["rxnorm_cui"],
+            category=row["category"] if "category" in keys else "prescription",
+            last_updated=row["last_updated"] if "last_updated" in keys else None,
+            atc_code=row["atc_code"] if "atc_code" in keys else None,
         )
 
     @staticmethod
     def _row_to_interaction(row: sqlite3.Row) -> Interaction:
+        keys = row.keys()
         return Interaction(
             id=row["id"],
             drug_a_id=row["drug_a_id"],
@@ -550,4 +623,8 @@ class GraphStore:
             mechanism=row["mechanism"],
             source=row["source"],
             evidence_count=row["evidence_count"],
+            evidence_level=row["evidence_level"] if "evidence_level" in keys else "D",
+            source_citation=row["source_citation"] if "source_citation" in keys else None,
+            last_updated=row["last_updated"] if "last_updated" in keys else None,
+            clinical_significance=row["clinical_significance"] if "clinical_significance" in keys else None,
         )

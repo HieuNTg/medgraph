@@ -47,6 +47,15 @@ _THRESHOLDS = [
     (0.0, "minor"),
 ]
 
+# Maps external severity codes (e.g. DrugBank A-X) to internal severity levels
+_SEVERITY_CODE_MAP: dict[str, str] = {
+    "A": "critical",   # contraindicated
+    "B": "major",
+    "C": "moderate",
+    "D": "minor",
+    "X": "critical",   # avoid combination
+}
+
 
 class RiskScorer:
     """
@@ -160,6 +169,29 @@ class RiskScorer:
         report.overall_score = self.score_report(report)
         report.overall_risk = self.classify_severity(report.overall_score)
         return report
+
+    @staticmethod
+    def standardize_severity(code: str) -> str:
+        """
+        Map an external severity code to an internal severity level.
+
+        Supports DrugBank-style letter codes (A, B, C, D, X):
+            A / X → critical
+            B     → major
+            C     → moderate
+            D     → minor
+
+        Unknown codes are returned unchanged (lowercased) so callers can
+        still pass already-normalized strings without double-mapping.
+
+        Args:
+            code: Severity code string (case-insensitive)
+
+        Returns:
+            Normalized severity string: "critical" | "major" | "moderate" | "minor"
+        """
+        normalized = code.strip().upper()
+        return _SEVERITY_CODE_MAP.get(normalized, code.strip().lower())
 
     # -------------------------------------------------------------------------
     # Private helpers

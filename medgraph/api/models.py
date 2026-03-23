@@ -69,6 +69,8 @@ class DrugResponse(BaseModel):
     brand_names: list[str]
     drug_class: Optional[str]
     enzyme_relations: list[EnzymeRelationResponse] = []
+    category: Optional[str] = None
+    last_updated: Optional[str] = None
 
 
 class CascadeStepResponse(BaseModel):
@@ -110,6 +112,9 @@ class InteractionResponse(BaseModel):
     evidence: list[EvidenceResponse]
     pgx_annotations: list[PGxAnnotation] = []
     explanation: str = ""
+    evidence_level: Optional[str] = None
+    source_citation: Optional[str] = None
+    clinical_significance: Optional[str] = None
 
 
 class CheckResponse(BaseModel):
@@ -129,6 +134,14 @@ class StatsResponse(BaseModel):
     interaction_count: int
     enzyme_count: int
     adverse_event_count: int
+
+
+class DataFreshnessResponse(BaseModel):
+    drug_count: int
+    interaction_count: int
+    enzyme_count: int
+    last_updated: Optional[str]
+    data_version: str
 
 
 class PaginatedResponse(BaseModel, Generic[T]):

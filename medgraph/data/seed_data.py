@@ -2210,3 +2210,34 @@ ADVERSE_EVENTS: list[dict] = [
         "source_url": None,
     },
 ]
+
+# ---------------------------------------------------------------------------
+# Apply evidence_level to existing interactions (default "D" if not present)
+# and category to existing drugs (default "prescription")
+# ---------------------------------------------------------------------------
+
+from medgraph.data.evidence_classifier import EvidenceClassifier as _EC  # noqa: E402
+
+_classifier = _EC()
+
+for _d in DRUGS:
+    _d.setdefault("category", "prescription")
+
+for _i in INTERACTIONS:
+    if "evidence_level" not in _i:
+        _i["evidence_level"] = _classifier.classify(
+            description=_i.get("description", ""),
+            mechanism=_i.get("mechanism", ""),
+            source=_i.get("source", ""),
+        )
+
+# ---------------------------------------------------------------------------
+# Merge supplement data into seed lists
+# ---------------------------------------------------------------------------
+
+from medgraph.data.supplement_provider import get_supplement_data as _get_supps  # noqa: E402
+
+_supps = _get_supps()
+DRUGS = DRUGS + _supps["drugs"]
+DRUG_ENZYME_RELATIONS = DRUG_ENZYME_RELATIONS + _supps["enzyme_relations"]
+INTERACTIONS = INTERACTIONS + _supps["interactions"]

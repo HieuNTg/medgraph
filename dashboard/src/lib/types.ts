@@ -4,6 +4,7 @@ export interface Drug {
   brand_names: string[];
   drug_class: string | null;
   enzyme_relations: EnzymeRelation[];
+  category?: string;
 }
 
 export interface EnzymeRelation {
@@ -21,6 +22,8 @@ export interface InteractionResult {
   mechanism: string | null;
   cascade_paths: CascadePath[];
   evidence: Evidence[];
+  evidence_level?: string;
+  source_citation?: string;
 }
 
 export interface CascadePath {

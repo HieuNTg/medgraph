@@ -12,6 +12,7 @@ Endpoints:
     GET  /api/v1/drugs/{drug_id}                        — Get drug details
     POST /api/v1/check                                  — Analyze drug interactions
     GET  /api/v1/stats                                  — DB statistics (cached hourly)
+    GET  /api/v1/data/freshness                         — Data freshness and version info
     GET  /api/v1/interactions/{interaction_id}/evidence  — Evidence for an interaction
 """
 
@@ -41,6 +42,7 @@ from medgraph.api.models import (
     CheckRequest,
     CheckResponse,
     CSVReportRequest,
+    DataFreshnessResponse,
     DrugResponse,
     EnzymeRelationResponse,
     EvidenceResponse,
@@ -264,6 +266,27 @@ def create_app() -> FastAPI:
         )
         app.state.stats_cache = (result, now + _STATS_TTL)
         return result
+
+    @router.get(
+        "/data/freshness",
+        response_model=DataFreshnessResponse,
+        tags=["system"],
+        dependencies=_api_deps,
+    )
+    async def get_data_freshness() -> DataFreshnessResponse:
+        """Return data freshness metadata: counts, last refresh timestamp, and data version."""
+        from medgraph.data.refresh_pipeline import DataRefreshPipeline
+
+        store: GraphStore = app.state.store
+        pipeline = DataRefreshPipeline(store)
+        info = pipeline.get_freshness()
+        return DataFreshnessResponse(
+            drug_count=info["drug_count"],
+            interaction_count=info["interaction_count"],
+            enzyme_count=info["enzyme_count"],
+            last_updated=info["last_updated"],
+            data_version=info["data_version"],
+        )
 
     @router.get("/drugs/search", response_model=PaginatedResponse[SearchResult], tags=["drugs"], dependencies=_api_deps)
     async def search_drugs(

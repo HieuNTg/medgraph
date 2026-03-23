@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { CascadePath } from "@/components/cascade-path";
+import { EvidenceBadge } from "@/components/evidence-badge";
 import { EvidencePanel } from "@/components/evidence-panel";
 import type { InteractionResult } from "@/lib/types";
 
@@ -76,11 +77,21 @@ export function InteractionCard({ interaction }: InteractionCardProps) {
                   {interaction.mechanism}
                 </p>
               )}
+              {interaction.source_citation && (
+                <p className="text-xs text-[var(--muted-foreground)] mt-0.5 italic">
+                  {interaction.source_citation}
+                </p>
+              )}
             </div>
           </div>
-          <Badge variant={config.badge} className="shrink-0">
-            {config.label}
-          </Badge>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <Badge variant={config.badge}>
+              {config.label}
+            </Badge>
+            {interaction.evidence_level && (
+              <EvidenceBadge level={interaction.evidence_level} />
+            )}
+          </div>
         </div>
 
         {/* Risk score */}
