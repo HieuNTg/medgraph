@@ -31,6 +31,7 @@ from fastapi.responses import Response
 
 from medgraph.api.auth import check_rate_limit, verify_api_key
 from medgraph.api.errors import register_error_handlers
+from medgraph.api.metrics import ANALYSIS_DURATION, GRAPH_EDGES, GRAPH_NODES, setup_metrics
 from medgraph.api.middleware import RequestIDMiddleware
 from medgraph.api.security import SecurityHeadersMiddleware
 
@@ -47,6 +48,7 @@ from medgraph.api.models import (
     CascadeStepResponse,
     HealthResponse,
     InteractionResponse,
+    LivenessResponse,
     JSONReportRequest,
     PaginatedResponse,
     PDFReportRequest,
@@ -95,6 +97,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.stats_cache = (None, 0.0)
 
     counts = store.get_counts()
+    # Set Prometheus gauges
+    GRAPH_NODES.set(graph.number_of_nodes())
+    GRAPH_EDGES.set(graph.number_of_edges())
+
     logger.info(
         f"MEDGRAPH loaded: {counts['drugs']} drugs, "
         f"{counts['interactions']} interactions, "
@@ -138,6 +144,32 @@ def _build_drug_response(
     )
 
 
+def _init_sentry() -> None:
+    """Initialize Sentry error tracking if SENTRY_DSN env var is set."""
+    dsn = os.environ.get("SENTRY_DSN")
+    if not dsn:
+        return
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+        try:
+            traces_rate = float(os.environ.get("SENTRY_TRACES_RATE", "0.1"))
+        except ValueError:
+            logger.warning("Invalid SENTRY_TRACES_RATE, falling back to 0.1")
+            traces_rate = 0.1
+
+        sentry_sdk.init(
+            dsn=dsn,
+            traces_sample_rate=traces_rate,
+            integrations=[FastApiIntegration()],
+            environment=os.environ.get("MEDGRAPH_ENV", "development"),
+        )
+        logger.info("Sentry error tracking initialized")
+    except ImportError:
+        logger.warning("SENTRY_DSN set but sentry-sdk not installed — skipping")
+
+
 def create_app() -> FastAPI:
     """Factory function for the FastAPI application."""
     configure_logging()
@@ -179,8 +211,20 @@ def create_app() -> FastAPI:
     # RFC 7807 Problem Details error handlers
     register_error_handlers(app)
 
-    @app.get("/health", response_model=HealthResponse, tags=["system"])
-    async def health() -> HealthResponse:
+    # Prometheus metrics (auto-instruments all endpoints)
+    setup_metrics(app)
+
+    # Sentry error tracking (only if SENTRY_DSN env var is set)
+    _init_sentry()
+
+    @app.get("/health/live", response_model=LivenessResponse, tags=["system"])
+    async def health_live() -> LivenessResponse:
+        """Liveness probe — returns 200 if process is responding (no DB check)."""
+        return LivenessResponse(status="ok")
+
+    @app.get("/health/ready", response_model=HealthResponse, tags=["system"])
+    async def health_ready() -> HealthResponse:
+        """Readiness probe — verifies DB accessible and graph loaded."""
         store: GraphStore = app.state.store
         graph = app.state.graph
         counts = store.get_counts()
@@ -190,6 +234,11 @@ def create_app() -> FastAPI:
             db_size=total,
             graph_nodes=graph.number_of_nodes(),
         )
+
+    @app.get("/health", response_model=HealthResponse, tags=["system"])
+    async def health() -> HealthResponse:
+        """Backward-compatible alias for /health/ready."""
+        return await health_ready()
 
     # ── Versioned API Router ──────────────────────────────────────────────
     # All endpoints live on an APIRouter, mounted at both /api/v1 (canonical)
@@ -335,8 +384,10 @@ def create_app() -> FastAPI:
 
         drug_ids = [d.id for d in found_drugs]
 
-        # Run analysis
+        # Run analysis (timed for Prometheus)
+        _t0 = time.perf_counter()
         report = analyzer.analyze(drug_ids, graph, store)
+        ANALYSIS_DURATION.observe(time.perf_counter() - _t0)
 
         # Apply pharmacogenomics adjustments if provided
         if request.metabolizer_phenotypes:

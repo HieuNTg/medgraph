@@ -148,6 +148,10 @@ class SearchResult(BaseModel):
     drug_class: Optional[str]
 
 
+class LivenessResponse(BaseModel):
+    status: str
+
+
 class HealthResponse(BaseModel):
     status: str
     db_size: int

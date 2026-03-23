@@ -36,4 +36,13 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
 
+        logger.debug(
+            "request_end",
+            extra={
+                "request_id": request_id,
+                "path": request.url.path,
+                "status_code": response.status_code,
+            },
+        )
+
         return response
