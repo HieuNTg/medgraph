@@ -1139,6 +1139,152 @@ def create_app() -> FastAPI:
     app.include_router(router, prefix="/api/v1")
     app.include_router(router, prefix="/api")
 
+    # ── FHIR R4 + CDS Hooks Router ────────────────────────────────────────
+    # Gracefully skip if fhir modules are unavailable (import guard).
+    try:
+        from medgraph.fhir.cds_hooks import CDSHooksService
+        from medgraph.fhir.capability import CapabilityStatement
+        from medgraph.fhir.models import CDSRequest, CDSResponse, OperationOutcome
+        from medgraph.fhir.parser import FHIRParser
+
+        fhir_router = APIRouter(tags=["fhir"])
+
+        def _get_cds_service() -> CDSHooksService:
+            return CDSHooksService(app.state.store, app.state.graph)
+
+        # CDS Hooks discovery
+        @fhir_router.get(
+            "/cds-services",
+            summary="CDS Hooks discovery",
+            description=(
+                "Returns available CDS Hooks service definitions. "
+                "FOR INFORMATIONAL PURPOSES ONLY."
+            ),
+        )
+        async def cds_services_discovery() -> dict:
+            svc = _get_cds_service()
+            return {"services": svc.get_services()}
+
+        # CDS Hooks order-select handler
+        @fhir_router.post(
+            "/cds-services/medgraph-order-select",
+            response_model=CDSResponse,
+            summary="CDS Hooks: order-select",
+            description=(
+                "Handle order-select CDS hook. Returns educational drug interaction cards. "
+                "FOR INFORMATIONAL PURPOSES ONLY — not medical advice."
+            ),
+        )
+        async def cds_order_select(request: CDSRequest) -> CDSResponse:
+            svc = _get_cds_service()
+            return svc.handle_order_select(request)
+
+        # FHIR CapabilityStatement (metadata)
+        @fhir_router.get(
+            "/fhir/metadata",
+            summary="FHIR R4 CapabilityStatement",
+            description="Returns the server's FHIR R4 CapabilityStatement.",
+        )
+        async def fhir_metadata() -> dict:
+            return CapabilityStatement().generate()
+
+        # FHIR MedicationRequest $check operation
+        @fhir_router.post(
+            "/fhir/MedicationRequest/$check",
+            response_model=CheckResponse,
+            summary="FHIR: Check drug interactions",
+            description=(
+                "Accept a FHIR MedicationRequest, MedicationStatement, or Bundle and return "
+                "a MEDGRAPH interaction analysis. FOR INFORMATIONAL PURPOSES ONLY."
+            ),
+        )
+        async def fhir_medication_check(fhir_resource: dict) -> CheckResponse:
+            store: GraphStore = app.state.store
+            graph = app.state.graph
+            analyzer: CascadeAnalyzer = app.state.analyzer
+
+            parser = FHIRParser(store)
+            drug_ids = parser.extract_drug_ids(fhir_resource)
+
+            if len(drug_ids) < 2:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"At least 2 resolvable medications required; "
+                        f"found {len(drug_ids)}. Ensure medications use RxNorm CUI codes "
+                        f"or names matching the MEDGRAPH drug database."
+                    ),
+                )
+
+            _t0 = time.perf_counter()
+            report = analyzer.analyze(drug_ids, graph, store)
+            ANALYSIS_DURATION.observe(time.perf_counter() - _t0)
+
+            enzymes_by_id = {e.id: e for e in store.get_all_enzymes()}
+
+            def _drug_resp(drug) -> DrugResponse:
+                return _build_drug_response(drug, store, enzymes_by_id)
+
+            interactions_out: list[InteractionResponse] = []
+            for result in report.interactions:
+                direct = result.direct_interaction
+                cascade_paths_out = [
+                    CascadePathResponse(
+                        steps=[
+                            CascadeStepResponse(
+                                source=s.source_drug,
+                                target=s.target,
+                                relation=s.relation,
+                                effect=s.effect,
+                            )
+                            for s in path.steps
+                        ],
+                        description=path.description,
+                        net_severity=path.net_severity,
+                    )
+                    for path in result.cascade_paths
+                ]
+                evidence_out = [
+                    EvidenceResponse(
+                        source=ev.source,
+                        description=ev.description,
+                        case_count=ev.evidence_count,
+                        url=ev.url,
+                    )
+                    for ev in result.evidence
+                ]
+                interactions_out.append(
+                    InteractionResponse(
+                        drug_a=_drug_resp(result.drug_a),
+                        drug_b=_drug_resp(result.drug_b),
+                        severity=result.severity,
+                        risk_score=result.risk_score,
+                        description=direct.description if direct else "",
+                        mechanism=direct.mechanism if direct else None,
+                        cascade_paths=cascade_paths_out,
+                        evidence=evidence_out,
+                    )
+                )
+
+            drugs_out = [_drug_resp(d) for d in report.drugs]
+
+            return CheckResponse(
+                drugs=drugs_out,
+                interactions=interactions_out,
+                overall_risk=report.overall_risk,
+                overall_score=report.overall_score,
+                drug_count=len(drugs_out),
+                interaction_count=len(interactions_out),
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                disclaimer=DISCLAIMER,
+            )
+
+        app.include_router(fhir_router)
+        logger.info("FHIR R4 + CDS Hooks endpoints registered")
+
+    except ImportError as _fhir_err:
+        logger.warning("FHIR/CDS Hooks endpoints not available: %s", _fhir_err)
+
     return app
 
 

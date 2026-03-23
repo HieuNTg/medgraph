@@ -8,9 +8,12 @@ API: https://rxnav.nlm.nih.gov/REST/ (free, no key required)
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import httpx
+
+if TYPE_CHECKING:
+    from medgraph.graph.store import GraphStore
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +27,14 @@ class RxNormClient:
 
     Normalizes drug name strings to standard RxCUI codes.
     Falls back to approximate (fuzzy) matching when exact match fails.
+
+    Includes a simple in-memory cache to avoid duplicate API calls within
+    the same process lifetime.
     """
+
+    def __init__(self) -> None:
+        # In-memory cache: name -> (rxcui, normalized_name) | None
+        self._cache: dict[str, Optional[tuple[str, str]]] = {}
 
     def normalize_drug_name(self, name: str) -> Optional[tuple[str, str]]:
         """
@@ -36,13 +46,51 @@ class RxNormClient:
         Returns:
             Tuple of (rxcui, normalized_name) or None if no match found
         """
+        key = name.strip().lower()
+        if key in self._cache:
+            return self._cache[key]
+
         # Try exact match first
         result = self._exact_match(name)
-        if result:
-            return result
+        if not result:
+            # Fuzzy fallback
+            result = self._approximate_match(name)
 
-        # Fuzzy fallback
-        return self._approximate_match(name)
+        self._cache[key] = result
+        return result
+
+    def resolve_batch(self, names: list[str]) -> dict[str, Optional[str]]:
+        """
+        Resolve multiple drug names to RxNorm CUIs in a single call.
+
+        Returns a dict mapping each input name to its RxCUI (or None if not found).
+        Uses in-memory cache to avoid redundant API calls.
+        """
+        results: dict[str, Optional[str]] = {}
+        for name in names:
+            match = self.normalize_drug_name(name)
+            results[name] = match[0] if match else None
+        return results
+
+    def resolve_rxcui_to_drug_id(
+        self, rxcui: str, store: "GraphStore"
+    ) -> Optional[str]:
+        """
+        Resolve a RxNorm CUI to a MEDGRAPH drug ID using the store.
+
+        Returns the MEDGRAPH drug ID string, or None if not found.
+        """
+        try:
+            with store._connect() as conn:
+                row = conn.execute(
+                    "SELECT id FROM drugs WHERE rxnorm_cui = ? LIMIT 1",
+                    (rxcui,),
+                ).fetchone()
+            if row:
+                return row["id"]
+        except Exception as exc:
+            logger.warning("resolve_rxcui_to_drug_id failed for %r: %s", rxcui, exc)
+        return None
 
     def get_drug_info(self, rxcui: str) -> dict:
         """
