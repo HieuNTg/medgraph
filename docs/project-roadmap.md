@@ -1,6 +1,18 @@
 # MEDGRAPH — Project Roadmap
 
-## v0.1.0 — MVP + Phase 2-3 Hardening & Observability (current)
+## v2.0.0 — All 5 Phases Complete (2026-03-23)
+**Status**: COMPLETE - All phases implemented and documented
+
+All 5 planned roadmap phases have been completed:
+- Phase 1: Data Expansion + Evidence Quality (2,500+ drugs, 1,500+ interactions with evidence levels)
+- Phase 2: Graph-Powered Features (alternatives, pathways, contraindication networks, deprescribing)
+- Phase 3: User Experience + Profiles (authentication, saved profiles, history, shareable results)
+- Phase 4: Clinical Integration (FHIR R4, CDS Hooks, Smart on FHIR, enterprise adoption)
+- Phase 5: Mobile + Advanced Features (PWA, offline, pill ID, voice input, polypharmacy optimizer)
+
+---
+
+## v0.1.0 — MVP + Phase 2-3 Hardening & Observability
 **Status**: Released
 
 **Phase 1 — Core**:
