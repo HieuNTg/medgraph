@@ -99,6 +99,8 @@ Copy `.env.example` to `.env` and edit as needed:
 | `MEDGRAPH_DB_PATH` | `data/medgraph.db` | SQLite database file path |
 | `MEDGRAPH_HOST` | `0.0.0.0` | Bind host for uvicorn |
 | `MEDGRAPH_PORT` | `8000` | Bind port |
+| `MEDGRAPH_ENV` | `development` | Set to `production` to enable HSTS security header |
+| `MEDGRAPH_CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Comma-separated CORS allowed origins |
 | `DRUGBANK_CSV` | _(unset)_ | Path to DrugBank full DB CSV for enrichment |
 | `OPENFDA_API_KEY` | _(unset)_ | OpenFDA API key (rate-limit relief) |
 

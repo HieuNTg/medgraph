@@ -65,8 +65,10 @@ WAL mode enabled; foreign keys enforced.
 ## API Layer
 - **Framework**: FastAPI with Pydantic V2 models
 - **Lifespan**: graph + store loaded once at startup via `asynccontextmanager`
-- **CORS**: localhost:5173 and localhost:3000 allowed (dev); configure for production
+- **CORS**: configurable via `MEDGRAPH_CORS_ORIGINS` env var (default: localhost:5173, localhost:3000)
 - **Stats cache**: 1-hour in-process TTL for `/api/stats`
+- **Security Headers**: `SecurityHeadersMiddleware` adds X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP (report-only), and HSTS (production only)
+- **Authentication**: API key verification & rate limiting on `/api/*` endpoints
 
 ## Frontend Architecture
 - **Router**: React Router v7 (`BrowserRouter`)

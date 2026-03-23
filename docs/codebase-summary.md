@@ -10,8 +10,10 @@ medgraph/
 │
 ├── api/
 │   ├── __init__.py
+│   ├── auth.py              — API key verification + rate limiting (check_rate_limit, verify_api_key)
 │   ├── models.py            — Pydantic V2 request/response models (CheckRequest, CheckResponse, …)
 │   ├── search.py            — DrugSearcher: fuzzy name → Drug lookup with optional RxNorm fallback
+│   ├── security.py          — SecurityHeadersMiddleware: CORS, CSP, HSTS, X-Frame-Options, etc.
 │   └── server.py            — FastAPI app factory, all route handlers, lifespan startup
 │
 ├── engine/
@@ -103,3 +105,16 @@ adverse_events      (id PK, drug_ids JSON, reaction, count, seriousness, source_
 | GET | `/api/drugs/{drug_id}` | Single drug detail with enzyme relations |
 | POST | `/api/check` | Main analysis: accepts 2–10 drug names, returns full cascade report |
 | GET | `/api/interactions/{id}/evidence` | FAERS evidence records for a specific interaction |
+
+## CI/CD Pipeline
+
+**GitHub Actions** (`.github/workflows/ci.yml`):
+1. **Lint** — ruff check & format validation (Python 3.11)
+2. **Test Backend** — pytest with coverage matrix (Python 3.11 & 3.12)
+3. **Test Frontend** — TypeScript type check & production build (Node 20)
+4. **Docker Build** — Image build + smoke test (container health check on startup)
+
+**Dependabot** (`.github/dependabot.yml`):
+- Weekly updates for pip, npm, and GitHub Actions
+- Major version bumps ignored for FastAPI, Pydantic, NetworkX, React, React DOM
+- Max 5 open PRs per ecosystem
