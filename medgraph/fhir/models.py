@@ -6,9 +6,6 @@ drug interaction checking via MedicationRequest / MedicationStatement.
 Full FHIR R4 spec: https://hl7.org/fhir/R4/
 """
 
-from __future__ import annotations
-
-from typing import Optional
 from pydantic import BaseModel
 
 
@@ -16,19 +13,19 @@ from pydantic import BaseModel
 
 
 class FHIRCoding(BaseModel):
-    system: Optional[str] = None
-    code: Optional[str] = None
-    display: Optional[str] = None
+    system: str | None = None
+    code: str | None = None
+    display: str | None = None
 
 
 class FHIRCodeableConcept(BaseModel):
     coding: list[FHIRCoding] = []
-    text: Optional[str] = None
+    text: str | None = None
 
 
 class FHIRReference(BaseModel):
-    reference: Optional[str] = None
-    display: Optional[str] = None
+    reference: str | None = None
+    display: str | None = None
 
 
 # ── FHIR R4 Resources ─────────────────────────────────────────────────────────
@@ -36,17 +33,17 @@ class FHIRReference(BaseModel):
 
 class MedicationRequest(BaseModel):
     resourceType: str = "MedicationRequest"
-    id: Optional[str] = None
-    status: Optional[str] = None
-    medicationCodeableConcept: Optional[FHIRCodeableConcept] = None
-    medicationReference: Optional[FHIRReference] = None
+    id: str | None = None
+    status: str | None = None
+    medicationCodeableConcept: FHIRCodeableConcept | None = None
+    medicationReference: FHIRReference | None = None
 
 
 class MedicationStatement(BaseModel):
     resourceType: str = "MedicationStatement"
-    id: Optional[str] = None
-    status: Optional[str] = None
-    medicationCodeableConcept: Optional[FHIRCodeableConcept] = None
+    id: str | None = None
+    status: str | None = None
+    medicationCodeableConcept: FHIRCodeableConcept | None = None
 
 
 class FHIRBundle(BaseModel):
@@ -65,15 +62,15 @@ class OperationOutcome(BaseModel):
 
 class CDSRequest(BaseModel):
     hook: str
-    hookInstance: Optional[str] = None
+    hookInstance: str | None = None
     context: dict = {}
     prefetch: dict = {}
 
 
 class CDSCard(BaseModel):
-    uuid: Optional[str] = None
+    uuid: str | None = None
     summary: str
-    detail: Optional[str] = None
+    detail: str | None = None
     indicator: str  # "info" | "warning" | "critical"
     source: dict
     suggestions: list[dict] = []
