@@ -27,11 +27,13 @@ Cascade analysis that simple checkers miss:
 - Multi-hop paths: Drug A → enzyme inhibition → Drug B accumulation → shared target with Drug C
 
 ## MVP Scope
-- 89 built-in drugs across major therapeutic classes
-- 28 curated drug-drug interactions with severity ratings
+- 89+ built-in drugs across major therapeutic classes
+- 28+ curated drug-drug interactions with severity ratings
 - 8 CYP450 enzymes (CYP1A2, CYP2C9, CYP2C19, CYP2D6, CYP3A4, CYP2B6, CYP2E1, CYP2C8)
+- CPIC pharmacogenomics guidelines for CYP2D6, CYP2C9, CYP2C19, CYP3A4
 - Expandable via DrugBank CSV import and OpenFDA enrichment pipeline
 - React 19 + TypeScript UI with cascade path visualization
+- REST API with RFC 7807 error standardization and request tracing
 
 ## Success Metrics
 - Correctly detects all seeded known cascade interactions
