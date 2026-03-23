@@ -16,10 +16,11 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedDrugs, setSelectedDrugs] = useState<SearchResult[]>([]);
-  const [open, setOpen] = useState(false);
+  const [forceClosed, setForceClosed] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const prevQueryRef = useRef(query);
 
   // Debounce query
   useEffect(() => {
@@ -41,11 +42,17 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
     (r) => !selectedDrugs.some((s) => s.id === r.id)
   );
 
-  const shouldBeOpen = filteredResults.length > 0 && query.trim().length >= 2;
+  // Derive open state — no useEffect needed
+  const open = filteredResults.length > 0 && query.trim().length >= 2 && !forceClosed;
+
+  // Reset highlightedIndex when query changes
   useEffect(() => {
-    setOpen(shouldBeOpen);
-    setHighlightedIndex(-1);
-  }, [shouldBeOpen]);
+    if (prevQueryRef.current !== query) {
+      setHighlightedIndex(-1);
+      setForceClosed(false);
+      prevQueryRef.current = query;
+    }
+  }, [query]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -56,7 +63,7 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
         inputRef.current &&
         !inputRef.current.contains(e.target as Node)
       ) {
-        setOpen(false);
+        setForceClosed(true);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -69,7 +76,7 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
       if (selectedDrugs.some((d) => d.id === drug.id)) return;
       setSelectedDrugs((prev) => [...prev, drug]);
       setQuery("");
-      setOpen(false);
+      setForceClosed(true);
       inputRef.current?.focus();
     },
     [selectedDrugs]
@@ -91,7 +98,7 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
       e.preventDefault();
       selectDrug(filteredResults[highlightedIndex]);
     } else if (e.key === "Escape") {
-      setOpen(false);
+      setForceClosed(true);
     }
   };
 
@@ -132,9 +139,7 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => {
-              if (filteredResults.length > 0 && query.trim().length >= 2) {
-                setOpen(true);
-              }
+              setForceClosed(false);
             }}
             placeholder={
               selectedDrugs.length === 0
@@ -145,9 +150,11 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
             }
             disabled={selectedDrugs.length >= 10 || loading}
             className="pl-9"
+            role="combobox"
             aria-label="Search medications"
             aria-autocomplete="list"
             aria-expanded={open}
+            aria-controls="drug-search-listbox"
           />
           {searching && (
             <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[var(--muted-foreground)]" />
@@ -158,6 +165,7 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
         {open && (
           <div
             ref={dropdownRef}
+            id="drug-search-listbox"
             className="absolute z-50 mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--popover)] shadow-lg"
             role="listbox"
           >
