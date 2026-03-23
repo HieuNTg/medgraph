@@ -38,6 +38,13 @@ docs/
 screenshots/
 plans/
 
+# Claude / analysis
+.claude/
+.understand-anything/
+
+# Tests (not needed in image)
+tests/
+
 # OS
 .DS_Store
 Thumbs.db

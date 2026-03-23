@@ -30,6 +30,7 @@ from fastapi.responses import Response
 from medgraph.api.auth import check_rate_limit, verify_api_key
 
 from medgraph import __version__
+from medgraph.logging_config import configure_logging
 from medgraph.api.models import (
     CheckRequest,
     CheckResponse,
@@ -125,6 +126,8 @@ def _build_drug_response(drug: Drug, store: GraphStore) -> DrugResponse:
 
 def create_app() -> FastAPI:
     """Factory function for the FastAPI application."""
+    configure_logging()
+
     app = FastAPI(
         title="MEDGRAPH API",
         description=(

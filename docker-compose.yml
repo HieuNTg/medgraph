@@ -13,6 +13,9 @@ services:
     environment:
       - MEDGRAPH_HOST=0.0.0.0
       - MEDGRAPH_PORT=8000
+      - MEDGRAPH_LOG_FORMAT=json
+      # Auth (optional): set MEDGRAPH_API_KEYS in .env
+      # Rate limiting: MEDGRAPH_RATE_LIMIT=60 MEDGRAPH_RATE_WINDOW=60
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c",
