@@ -56,7 +56,7 @@ medgraph/
 ```
 dashboard/src/
 ├── main.tsx                 — React app entry, QueryClientProvider + RouterProvider
-├── App.tsx                  — Root router configuration
+├── App.tsx                  — Root router w/ ErrorBoundary; Suspense + AnalysisSkeleton for lazy routes
 ├── index.css                — Tailwind v4 directives + CSS variable theme definitions
 ├── App.css                  — Global resets
 │
@@ -71,19 +71,28 @@ dashboard/src/
 │   └── about.tsx            — Project info, data sources, methodology
 │
 ├── components/
-│   ├── drug-input.tsx       — Multi-drug search input with typeahead suggestions
+│   ├── error-boundary.tsx   — React error boundary: catches render errors, shows retry UI
+│   ├── error-display.tsx    — Standardized error card w/ retry callback, network error icon
+│   ├── loading-skeleton.tsx — SearchResultsSkeleton, AnalysisSkeleton (pulse animations, a11y labels)
+│   ├── drug-input.tsx       — Multi-drug search input w/ aria-controls, role="combobox"
 │   ├── interaction-card.tsx — Card showing a single drug pair interaction + severity badge
 │   ├── cascade-path.tsx     — Visual step-by-step cascade path (enzyme chain)
 │   ├── risk-summary.tsx     — Overall risk score banner + breakdown bar
 │   ├── evidence-panel.tsx   — Collapsible FAERS evidence list for an interaction
 │   ├── medical-disclaimer.tsx — Amber disclaimer banner (always visible)
+│   ├── __tests__/           — Component & integration tests (7 test files, 40 tests)
 │   └── ui/                  — Shared primitives (Badge, Card, Progress, Separator, …)
 │
-└── lib/
-    ├── api.ts               — Typed fetch wrappers for all API endpoints
-    ├── query-client.ts      — TanStack QueryClient singleton configuration
-    ├── types.ts             — TypeScript interfaces mirroring API response shapes
-    └── utils.ts             — cn() helper, severity colour maps, formatting utilities
+├── lib/
+│   ├── api.ts               — Typed fetch wrappers for all API endpoints
+│   ├── query-client.ts      — TanStack QueryClient singleton configuration
+│   ├── types.ts             — TypeScript interfaces mirroring API response shapes
+│   ├── utils.ts             — cn() helper, severity colour maps, formatting utilities
+│   └── __tests__/           — API integration tests (api.test.ts)
+│
+└── test/
+    ├── setup.ts             — Vitest + jest-dom + vitest-axe matchers
+    └── test-utils.tsx       — renderWithProviders() helper wraps QueryClient + MemoryRouter
 ```
 
 ## Key Classes
@@ -143,7 +152,9 @@ All endpoints accessible at `/api/v1/*` (canonical) and `/api/*` (backward compa
 - Request IDs included in structured JSON logs when MEDGRAPH_LOG_FORMAT=json
 - Optional Sentry error tracking when SENTRY_DSN is set
 
-## Testing (Phase 2 + Phase 3 + Phase 4)
+## Testing (Phase 2–5)
+
+**Backend Tests** (pytest, ~51 combined tests):
 
 **test_api_hardening.py** (17 tests, Phase 2):
 - API v1 prefix routing (/api/v1/* + /api/*)
@@ -155,12 +166,11 @@ All endpoints accessible at `/api/v1/*` (canonical) and `/api/*` (backward compa
 
 **test_observability.py** (14 tests, Phase 3):
 - Prometheus metrics endpoint (/metrics) returns 200 with Prometheus text format
-- Custom metrics present: medgraph_analysis_duration_seconds, medgraph_graph_nodes_total, medgraph_graph_edges_total
+- Custom metrics: medgraph_analysis_duration_seconds, medgraph_graph_nodes_total, medgraph_graph_edges_total
 - Health endpoint split: /health/live (liveness), /health/ready (readiness), /health (backward compat)
 - Structured JSON logging with request_id field
 - JSONFormatter produces valid JSON with timestamp, level, logger, message fields
 - Sentry initialization when SENTRY_DSN is set
-- Sentry skipped (with warning) when sentry-sdk not installed but SENTRY_DSN set
 
 **test_database.py** (20 tests, Phase 4):
 - Schema version tracking: get_schema_version(), set_schema_version()
@@ -170,6 +180,20 @@ All endpoints accessible at `/api/v1/*` (canonical) and `/api/*` (backward compa
 - Expanded seed data: 297 new drugs, 61 new interactions loaded via seed_expanded()
 - Migration runner: upgrade, downgrade, current revision tracking
 - Alembic baseline migration (001) captures full schema
+
+**Frontend Tests** (Vitest + React Testing Library + axe-core, 40 tests, Phase 5):
+- **Test Setup** (`src/test/setup.ts`): jest-dom + vitest-axe matchers auto-extended for toHaveNoViolations()
+- **Render Helper** (`src/test/test-utils.tsx`): renderWithProviders() wraps components w/ QueryClient + MemoryRouter
+- **7 Test Files**:
+  - `error-boundary.test.tsx` — ErrorBoundary catches render errors, shows fallback, hides stack traces, retries via retryKey remount
+  - `error-display.test.tsx` — ErrorDisplay shows network vs alert icon, onRetry callback, role="alert"
+  - `loading-skeleton.test.tsx` — SearchResultsSkeleton, AnalysisSkeleton: pulse animations, role="status", sr-only messages
+  - `drug-input.test.tsx` — DrugInput: role="combobox", aria-controls, debounced search, keyboard nav, accessibility attributes
+  - `risk-summary.test.tsx` — RiskSummary: risk score display, severity breakdown, correct calculations
+  - `accessibility.test.tsx` — Axe-core sweeps: ErrorDisplay, SearchResultsSkeleton, AnalysisSkeleton, DrugInput (zero violations)
+  - `api.test.ts` — API module: searchDrugs, checkInteractions, getDrug typed requests
+- **Coverage** (`@vitest/coverage-v8`): v8 instrumentation for coverage reports
+- **TypeScript** (`tsconfig.app.json`): Strict mode, vitest/globals types, path aliases (@/)
 
 ## CI/CD Pipeline
 

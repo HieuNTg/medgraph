@@ -83,11 +83,15 @@ WAL mode enabled; foreign keys enforced. All tables managed by Alembic migration
 - **Error Tracking** (Phase 3): Optional Sentry integration via SENTRY_DSN env var; configurable traces sample rate (SENTRY_TRACES_RATE, default 0.1)
 
 ## Frontend Architecture
-- **Router**: React Router v7 (`BrowserRouter`)
+- **Router**: React Router v7 (`BrowserRouter`); lazy code-splitting on `/results`
 - **Data fetching**: TanStack Query v5 (cache + background refetch)
+- **Error Boundary**: Component-level error catching w/ retry (remounts child via retryKey increment)
+- **Suspense + Loading States**: AnalysisSkeleton as fallback for lazy-loaded pages; SearchResultsSkeleton in dropdowns
 - **Pages**: `Home`, `Checker`, `Results`, `DrugInfo`, `About`
 - **Layout**: `AppShell` with nav + medical disclaimer banner always visible
 - **Styling**: Tailwind v4 with CSS variables for light/dark theming
+- **Accessibility**: Semantic HTML, ARIA labels, axe-core verified components
+- **Testing**: Vitest + React Testing Library + vitest-axe (40 tests, zero a11y violations)
 
 ## Phase 3: Observability & Monitoring
 
@@ -144,3 +148,59 @@ WAL mode enabled; foreign keys enforced. All tables managed by Alembic migration
 - `python -m medgraph.cli db backup [--output path]` — create backup
 - `python -m medgraph.cli db restore <backup_file>` — restore from backup
 - `python -m medgraph.cli expand` — load extended drug data (297 drugs, 182 enzyme relations)
+
+## Phase 5: Frontend Quality & Testing
+
+**Error Handling & Resilience** — Graceful degradation:
+- `ErrorBoundary`: Class component catches render errors in child subtree; shows user-friendly fallback w/ "Try Again" button (remounts via retryKey); logs to console (never exposes stack traces to UI)
+- `ErrorDisplay`: Standardized card component for async errors; distinguishes network errors (WifiOff icon) from generic alerts (AlertTriangle); onRetry callback support
+- Both components hide implementation details from users; styled consistently w/ rest of app
+
+**Loading States & Skeleton Screens** — UX placeholder patterns:
+- `SearchResultsSkeleton`: 4-item pulse-animation list (combobox dropdown state)
+- `AnalysisSkeleton`: Multi-card skeleton matching full results page layout (pulse blocks for risk summary + 3 interaction cards)
+- Both marked `role="status"` w/ `sr-only` messages for screen readers
+- Prevents layout shift; reduces perceived latency
+
+**Accessibility (a11y)** — WCAG-compliant:
+- **DrugInput**: `role="combobox"`, `aria-controls="results"`, `aria-expanded`, `aria-haspopup="listbox"`; keyboard nav (ArrowDown/Up/Enter/Escape); derived `open` state (no setState dependency)
+- **Skeletons**: `role="status"` + `aria-hidden="true"` on individual pulse blocks; `<span class="sr-only">` messaging
+- **Error Components**: `role="alert"` on ErrorDisplay; semantic icons (Lucide)
+- **axe-core Testing**: All 4 components verified zero violations
+
+**Frontend Testing Stack** (Phase 5):
+
+**Configuration**:
+- **Vitest**: Globals-enabled (`globals: true`), jsdom environment, setup file auto-loads
+- **jest-dom**: `@testing-library/jest-dom/vitest` extends matchers (toBeInTheDocument, toBeVisible, etc.)
+- **vitest-axe**: `vitest-axe/matchers` extends with toHaveNoViolations(); custom type augmentation in setup.ts
+- **TypeScript**: `tsconfig.app.json` includes `vitest/globals` types; strict mode enabled
+
+**Render Helper** (`test-utils.tsx`):
+- `renderWithProviders(ui, options?)` — wraps components w/ QueryClient + MemoryRouter
+- Fresh QueryClient per test (queries/mutations retry: false, staleTime: 0)
+- Supports route prop for router-dependent tests
+- Returns render result + queryClient for assertions
+
+**Test Files** (7 files, 40 tests):
+1. `error-boundary.test.tsx` — 5 tests: renders children, shows fallback, hides stack trace, retries, custom fallback
+2. `error-display.test.tsx` — 3 tests: message display, network error icon, retry callback
+3. `loading-skeleton.test.tsx` — 2 tests: SearchResultsSkeleton, AnalysisSkeleton render
+4. `drug-input.test.tsx` — 8 tests: query input, debounce, search integration, selection, keyboard nav
+5. `risk-summary.test.tsx` — 6 tests: score display, breakdown, color mapping, risk label
+6. `accessibility.test.tsx` — 4 tests: axe-core verification (ErrorDisplay, Skeletons, DrugInput)
+7. `api.test.ts` — 12 tests: searchDrugs, checkInteractions, getDrug, error handling
+
+**Test Commands**:
+- `npm run test` — single-run Vitest (40 tests in ~2–3s)
+- `npm run test:watch` — interactive watch mode w/ file filtering
+- `npm run test:coverage` — generates v8 coverage report (HTML @ htmlcov/)
+
+**Dependencies** (dashboard/package.json):
+- `@testing-library/react`: 16.3.2 (render, screen, fireEvent)
+- `@testing-library/jest-dom`: 6.9.1 (matchers)
+- `@testing-library/user-event`: 14.6.1 (realistic user interactions)
+- `vitest`: 4.1.0 (test runner)
+- `@vitest/coverage-v8`: 4.1.0 (coverage instrumentation)
+- `vitest-axe`: 0.1.0 (accessibility testing)
+- `jsdom`: 29.0.1 (DOM simulation environment)
