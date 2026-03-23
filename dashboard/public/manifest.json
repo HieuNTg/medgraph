@@ -1,0 +1,12 @@
+{
+  "name": "MEDGRAPH - Drug Interaction Analyzer",
+  "short_name": "MEDGRAPH",
+  "description": "Multi-hop drug interaction cascade analyzer",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "64x64", "type": "image/x-icon" }
+  ]
+}
