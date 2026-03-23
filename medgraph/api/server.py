@@ -28,6 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from medgraph.api.auth import check_rate_limit, verify_api_key
+from medgraph.api.security import SecurityHeadersMiddleware
 
 from medgraph import __version__
 from medgraph.logging_config import configure_logging
@@ -139,12 +140,18 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # CORS origins: configurable via MEDGRAPH_CORS_ORIGINS env var (comma-separated)
+    cors_origins_raw = os.environ.get(
+        "MEDGRAPH_CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
+    )
+    cors_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://localhost:3000"],
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=cors_origins,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Api-Key"],
     )
+    app.add_middleware(SecurityHeadersMiddleware)
 
     @app.get("/health", response_model=HealthResponse, tags=["system"])
     async def health() -> HealthResponse:
