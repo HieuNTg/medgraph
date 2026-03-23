@@ -23,9 +23,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+
+from medgraph.api.auth import check_rate_limit, verify_api_key
 
 from medgraph import __version__
 from medgraph.api.models import (
@@ -151,7 +153,10 @@ def create_app() -> FastAPI:
             graph_nodes=graph.number_of_nodes(),
         )
 
-    @app.get("/api/stats", response_model=StatsResponse, tags=["system"])
+    # Auth + rate limit dependencies for all /api/* endpoints
+    _api_deps = [Depends(verify_api_key), Depends(check_rate_limit)]
+
+    @app.get("/api/stats", response_model=StatsResponse, tags=["system"], dependencies=_api_deps)
     async def stats() -> StatsResponse:
         cached_result, expiry = app.state.stats_cache
         now = time.monotonic()
@@ -169,7 +174,7 @@ def create_app() -> FastAPI:
         app.state.stats_cache = (result, now + _STATS_TTL)
         return result
 
-    @app.get("/api/drugs/search", response_model=list[SearchResult], tags=["drugs"])
+    @app.get("/api/drugs/search", response_model=list[SearchResult], tags=["drugs"], dependencies=_api_deps)
     async def search_drugs(
         q: str = Query(..., min_length=1, description="Drug name search query"),
         limit: int = Query(10, ge=1, le=50),
@@ -186,7 +191,7 @@ def create_app() -> FastAPI:
             for drug in results
         ]
 
-    @app.get("/api/drugs/{drug_id}", response_model=DrugResponse, tags=["drugs"])
+    @app.get("/api/drugs/{drug_id}", response_model=DrugResponse, tags=["drugs"], dependencies=_api_deps)
     async def get_drug(drug_id: str) -> DrugResponse:
         store: GraphStore = app.state.store
         drug = store.get_drug_by_id(drug_id)
@@ -198,6 +203,7 @@ def create_app() -> FastAPI:
         "/api/interactions/{interaction_id}/evidence",
         response_model=list[EvidenceResponse],
         tags=["analysis"],
+        dependencies=_api_deps,
     )
     async def get_interaction_evidence(interaction_id: str) -> list[EvidenceResponse]:
         store: GraphStore = app.state.store
@@ -221,7 +227,7 @@ def create_app() -> FastAPI:
                 )
         return evidence
 
-    @app.post("/api/check", response_model=CheckResponse, tags=["analysis"])
+    @app.post("/api/check", response_model=CheckResponse, tags=["analysis"], dependencies=_api_deps)
     async def check(request: CheckRequest) -> CheckResponse:
         """
         Analyze drug-drug interactions for a set of drugs.
@@ -382,7 +388,7 @@ def create_app() -> FastAPI:
             disclaimer=DISCLAIMER,
         )
 
-    @app.post("/api/report/pdf", tags=["reports"])
+    @app.post("/api/report/pdf", tags=["reports"], dependencies=_api_deps)
     async def generate_pdf_report(request: PDFReportRequest) -> Response:
         """Generate a PDF report from check results."""
         from medgraph.reports.pdf_generator import generate_report_pdf
@@ -399,7 +405,7 @@ def create_app() -> FastAPI:
             },
         )
 
-    @app.post("/api/report/json", tags=["reports"])
+    @app.post("/api/report/json", tags=["reports"], dependencies=_api_deps)
     async def generate_json_report(request: JSONReportRequest) -> Response:
         """Generate a structured JSON report from check results."""
         from medgraph.reports.json_generator import generate_report_json
@@ -416,7 +422,7 @@ def create_app() -> FastAPI:
             },
         )
 
-    @app.post("/api/report/csv", tags=["reports"])
+    @app.post("/api/report/csv", tags=["reports"], dependencies=_api_deps)
     async def generate_csv_report(request: CSVReportRequest) -> Response:
         """Generate a CSV report of drug interactions."""
         from medgraph.reports.csv_generator import generate_report_csv
