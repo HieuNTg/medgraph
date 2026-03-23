@@ -107,6 +107,7 @@ class InteractionResponse(BaseModel):
     cascade_paths: list[CascadePathResponse]
     evidence: list[EvidenceResponse]
     pgx_annotations: list[PGxAnnotation] = []
+    explanation: str = ""
 
 
 class CheckResponse(BaseModel):
@@ -118,6 +119,7 @@ class CheckResponse(BaseModel):
     interaction_count: int
     timestamp: str
     disclaimer: str
+    summary: str = ""
 
 
 class StatsResponse(BaseModel):

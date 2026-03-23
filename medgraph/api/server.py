@@ -50,6 +50,7 @@ from medgraph.api.models import (
 )
 from medgraph.api.search import DrugSearcher
 from medgraph.engine.analyzer import CascadeAnalyzer
+from medgraph.engine.explainer import explain_interaction, explain_report
 from medgraph.graph.builder import GraphBuilder
 from medgraph.graph.models import Drug
 from medgraph.graph.store import GraphStore
@@ -397,6 +398,7 @@ def create_app() -> FastAPI:
                     cascade_paths=cascade_paths_resp,
                     evidence=evidence_resp,
                     pgx_annotations=pgx_annotations,
+                    explanation=explain_interaction(result),
                 )
             )
 
@@ -409,6 +411,7 @@ def create_app() -> FastAPI:
             interaction_count=len(report.interactions),
             timestamp=datetime.now(timezone.utc).isoformat(),
             disclaimer=DISCLAIMER,
+            summary=explain_report(report),
         )
 
     @app.post("/api/report/pdf", tags=["reports"], dependencies=_api_deps)

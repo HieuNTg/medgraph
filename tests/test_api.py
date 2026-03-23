@@ -124,6 +124,15 @@ class TestCheckEndpoint:
         data = resp.json()
         assert "informational" in data["disclaimer"].lower()
 
+    def test_check_has_explanation_and_summary(self, client: TestClient) -> None:
+        resp = client.post("/api/check", json={"drugs": ["Warfarin", "Aspirin"]})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["summary"] != ""
+        assert "medication" in data["summary"].lower()
+        for ix in data["interactions"]:
+            assert ix["explanation"] != ""
+
     def test_check_include_evidence_false(self, client: TestClient) -> None:
         resp = client.post(
             "/api/check",
