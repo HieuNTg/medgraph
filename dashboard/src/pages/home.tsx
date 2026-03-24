@@ -1,57 +1,54 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Shield, Network, FileSearch, ArrowRight, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { getStats } from "@/lib/api";
 
-const FEATURES = [
-  {
-    icon: FileSearch,
-    title: "Real FDA Data",
-    description:
-      "Powered by OpenFDA, DrugBank, and RxNorm — the same databases used by medical professionals.",
-  },
-  {
-    icon: Network,
-    title: "Cascade Analysis",
-    description:
-      "Detects multi-drug enzyme pathway conflicts that simple interaction checkers miss entirely.",
-  },
-  {
-    icon: Shield,
-    title: "Evidence Trail",
-    description:
-      "Every interaction includes FDA adverse event case counts and source citations for full transparency.",
-  },
-];
-
-const HOW_IT_WORKS = [
-  {
-    step: "1",
-    title: "Enter Your Medications",
-    description: "Type the names of your medications and select them from our database.",
-  },
-  {
-    step: "2",
-    title: "Analyze Cascade Pathways",
-    description:
-      "Our engine maps enzyme pathways (CYP450, etc.) to detect cascading interaction risks.",
-  },
-  {
-    step: "3",
-    title: "Review Your Report",
-    description:
-      "Get a detailed report with severity ratings, mechanisms, and evidence for each interaction.",
-  },
-];
-
 export function HomePage() {
+  const { t } = useTranslation();
   const { data: stats, isLoading } = useQuery({
     queryKey: ["stats"],
     queryFn: getStats,
     staleTime: 10 * 60 * 1000,
   });
+
+  const FEATURES = [
+    {
+      icon: FileSearch,
+      title: t("home.feature_data"),
+      description: t("home.feature_data_desc"),
+    },
+    {
+      icon: Network,
+      title: t("home.feature_cascade"),
+      description: t("home.feature_cascade_desc"),
+    },
+    {
+      icon: Shield,
+      title: t("home.feature_evidence"),
+      description: t("home.feature_evidence_desc"),
+    },
+  ];
+
+  const HOW_IT_WORKS = [
+    {
+      step: "1",
+      title: t("checker.title"),
+      description: t("checker.subtitle"),
+    },
+    {
+      step: "2",
+      title: t("home.feature_cascade"),
+      description: t("home.feature_cascade_desc"),
+    },
+    {
+      step: "3",
+      title: t("results.title"),
+      description: t("home.feature_evidence_desc"),
+    },
+  ];
 
   return (
     <div className="space-y-20 py-12">
@@ -68,20 +65,19 @@ export function HomePage() {
             <span className="text-[var(--primary)]">Before They Harm You</span>
           </h1>
           <p className="mx-auto max-w-2xl text-lg text-[var(--muted-foreground)] leading-relaxed">
-            Cascade analysis detects multi-drug enzyme pathway risks that simple
-            checkers miss. Built on FDA data, designed for clarity.
+            {t("home.hero_subtitle")}
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Button asChild size="lg" className="min-w-[200px]">
             <Link to="/checker">
-              Check Your Medications
+              {t("home.cta")}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link to="/about">How It Works</Link>
+            <Link to="/about">{t("about.how_it_works")}</Link>
           </Button>
         </div>
 
@@ -91,7 +87,7 @@ export function HomePage() {
             {isLoading ? (
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading database stats...
+                {t("common.loading")}
               </div>
             ) : stats ? (
               <>
@@ -146,7 +142,7 @@ export function HomePage() {
       <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="text-center space-y-3 mb-10">
           <h2 className="text-2xl font-bold text-[var(--foreground)]">
-            How MEDGRAPH Works
+            {t("about.how_it_works")}
           </h2>
           <p className="text-[var(--muted-foreground)]">
             Three steps to a comprehensive drug interaction report
@@ -180,7 +176,7 @@ export function HomePage() {
           </p>
           <Button asChild variant="outline" size="lg" className="bg-white text-[var(--primary)] hover:bg-blue-50 border-white">
             <Link to="/checker">
-              Start Checking Now
+              {t("home.cta")}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { X, Search, Loader2, Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ interface DrugInputProps {
 }
 
 export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedDrugs, setSelectedDrugs] = useState<SearchResult[]>([]);
@@ -101,6 +103,18 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
 
   const canSubmit = selectedDrugs.length >= 2 && !loading;
 
+  const getPlaceholder = () => {
+    if (selectedDrugs.length === 0) return t("checker.search_placeholder");
+    if (selectedDrugs.length >= 10) return t("checker.max_reached");
+    return t("checker.search_placeholder_add");
+  };
+
+  const getHintText = () => {
+    if (selectedDrugs.length === 0) return t("checker.add_hint_0");
+    if (selectedDrugs.length === 1) return t("checker.add_hint_1");
+    return t("checker.add_hint_n", { count: selectedDrugs.length });
+  };
+
   return (
     <div className="space-y-4">
       {/* Selected drugs */}
@@ -139,17 +153,11 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
               onFocus={() => {
                 setForceClosed(false);
               }}
-              placeholder={
-                selectedDrugs.length === 0
-                  ? "Search for a medication (e.g. Warfarin, Aspirin)..."
-                  : selectedDrugs.length >= 10
-                  ? "Maximum 10 drugs reached"
-                  : "Add another medication..."
-              }
+              placeholder={getPlaceholder()}
               disabled={selectedDrugs.length >= 10 || loading}
               className="pl-9"
               role="combobox"
-              aria-label="Search medications"
+              aria-label={t("common.search")}
               aria-autocomplete="list"
               aria-expanded={open}
               aria-controls="drug-search-listbox"
@@ -216,9 +224,7 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-[var(--muted-foreground)]">
-          {selectedDrugs.length === 0 && "Add at least 2 medications to check interactions."}
-          {selectedDrugs.length === 1 && "Add 1 more medication to check interactions."}
-          {selectedDrugs.length >= 2 && `${selectedDrugs.length} medications selected.`}
+          {getHintText()}
         </p>
         <Button
           onClick={() => onSubmit(selectedDrugs.map((d) => d.name))}
@@ -229,10 +235,10 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Analyzing...
+              {t("checker.analyzing")}
             </>
           ) : (
-            "Check Interactions"
+            t("checker.check_button")
           )}
         </Button>
       </div>

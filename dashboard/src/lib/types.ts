@@ -24,6 +24,9 @@ export interface InteractionResult {
   evidence: Evidence[];
   evidence_level?: string;
   source_citation?: string;
+  confidence_score?: number;
+  confidence_level?: string;
+  confidence_factors?: string[];
 }
 
 export interface CascadePath {
@@ -173,4 +176,21 @@ export interface OptimizationResult {
   alternative_regimens: Record<string, unknown>[];
   rationale: string;
   disclaimer: string;
+}
+
+// ── PGx / Confidence Types ────────────────────────────────────────────────────
+
+export interface PGxAlert {
+  drug_name: string;
+  gene: string;
+  phenotype: string;
+  recommendation: string;
+  severity_multiplier: number;
+  population_frequency: number | null;
+}
+
+export interface ConfidenceInfo {
+  score: number;
+  level: string;
+  factors: string[];
 }

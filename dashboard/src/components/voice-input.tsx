@@ -3,6 +3,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Mic, MicOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 
 interface VoiceInputProps {
@@ -19,6 +20,7 @@ const SpeechRecognitionAPI =
 const isSupported = SpeechRecognitionAPI != null;
 
 export function VoiceInput({ onResult, disabled = false }: VoiceInputProps) {
+  const { t } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const recognitionRef = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
@@ -50,9 +52,9 @@ export function VoiceInput({ onResult, disabled = false }: VoiceInputProps) {
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === "not-allowed") {
-        setErrorMsg("Microphone access denied.");
+        setErrorMsg(t("voice.mic_denied"));
       } else if (event.error !== "aborted") {
-        setErrorMsg("Voice recognition error. Try again.");
+        setErrorMsg(t("voice.error"));
       }
       setIsRecording(false);
     };
@@ -61,7 +63,7 @@ export function VoiceInput({ onResult, disabled = false }: VoiceInputProps) {
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [disabled, onResult]);
+  }, [disabled, onResult, t]);
 
   const stopRecording = useCallback(() => {
     recognitionRef.current?.stop();
@@ -72,7 +74,7 @@ export function VoiceInput({ onResult, disabled = false }: VoiceInputProps) {
     return (
       <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
         <MicOff className="h-4 w-4" aria-hidden="true" />
-        <span>Voice input not supported in this browser.</span>
+        <span>{t("voice.not_supported")}</span>
       </div>
     );
   }
@@ -85,7 +87,7 @@ export function VoiceInput({ onResult, disabled = false }: VoiceInputProps) {
         size="icon"
         onClick={isRecording ? stopRecording : startRecording}
         disabled={disabled}
-        aria-label={isRecording ? "Stop voice input" : "Start voice input"}
+        aria-label={isRecording ? t("voice.stop") : t("voice.start")}
         aria-pressed={isRecording}
         className={`relative h-10 w-10 transition-colors ${
           isRecording
@@ -109,7 +111,7 @@ export function VoiceInput({ onResult, disabled = false }: VoiceInputProps) {
 
       {isRecording && (
         <p className="text-xs text-red-500 animate-pulse" role="status">
-          Listening...
+          {t("voice.listening")}
         </p>
       )}
 

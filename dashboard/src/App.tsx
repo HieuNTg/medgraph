@@ -31,6 +31,10 @@ const SharedResultPage = lazy(() =>
   import("@/pages/shared-result").then((m) => ({ default: m.SharedResultPage }))
 );
 
+const NetworkPage = lazy(() =>
+  import("@/pages/network").then((m) => ({ default: m.NetworkPage }))
+);
+
 function App() {
   return (
     <ErrorBoundary>
@@ -96,6 +100,14 @@ function App() {
                   element={
                     <Suspense fallback={<AnalysisSkeleton />}>
                       <SharedResultPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/network"
+                  element={
+                    <Suspense fallback={<AnalysisSkeleton />}>
+                      <NetworkPage />
                     </Suspense>
                   }
                 />

@@ -118,6 +118,10 @@ class DataSeeder:
                 task, description="Pharmacogenomics guidelines seeded", completed=1, total=1
             )
 
+            task = progress.add_task("Seeding CPIC guidelines...", total=None)
+            self._seed_cpic_guidelines()
+            progress.update(task, description="CPIC guidelines seeded", completed=1, total=1)
+
             task = progress.add_task("Seeding food interactions...", total=None)
             self._seed_food_interactions()
             progress.update(task, description="Food interactions seeded", completed=1, total=1)
@@ -236,6 +240,22 @@ class DataSeeder:
                 self.store.upsert_genetic_guideline(GeneticGuideline(**g))
         except ImportError:
             logger.debug("seed_pharmacogenomics not available — skipping")
+
+    def _seed_cpic_guidelines(self) -> None:
+        try:
+            from medgraph.data.seed_cpic_guidelines import (
+                CPIC_GUIDELINES,
+                SUPPLEMENTARY_DRUGS,
+            )
+            from medgraph.graph.models import Drug, GeneticGuideline
+
+            # Ensure all referenced drugs exist before inserting FK-constrained guidelines
+            for d in SUPPLEMENTARY_DRUGS:
+                self.store.upsert_drug(Drug(**d))
+            for g in CPIC_GUIDELINES:
+                self.store.upsert_genetic_guideline(GeneticGuideline(**g))
+        except ImportError:
+            logger.debug("seed_cpic_guidelines not available — skipping")
 
     def _seed_food_interactions(self) -> None:
         try:

@@ -94,6 +94,9 @@ from medgraph.api.models import (
     PathwayResponse,
     PDFReportRequest,
     PGxAnnotation,
+    PGxDrugAlert,
+    PGxRiskRequest,
+    PGxRiskResponse,
     ProfileRequest,
     ProfileResponse,
     RefreshRequest,
@@ -627,6 +630,8 @@ def create_app() -> FastAPI:
                                     )
                                 )
 
+            confidence = analyzer.scorer.compute_confidence(result)
+
             interactions_response.append(
                 InteractionResponse(
                     drug_a=_build_drug_response(result.drug_a, store, enzymes_by_id),
@@ -639,6 +644,9 @@ def create_app() -> FastAPI:
                     evidence=evidence_resp,
                     pgx_annotations=pgx_annotations,
                     explanation=explain_interaction(result),
+                    confidence_score=confidence["score"],
+                    confidence_level=confidence["level"],
+                    confidence_factors=confidence["factors"],
                 )
             )
 
@@ -752,6 +760,97 @@ def create_app() -> FastAPI:
             }
             for gl in guidelines
         ]
+
+    @router.post(
+        "/pgx/risk-profile",
+        response_model=PGxRiskResponse,
+        tags=["pharmacogenomics"],
+        dependencies=_api_deps,
+    )
+    async def pgx_risk_profile(request: PGxRiskRequest) -> PGxRiskResponse:
+        """Calculate personalized drug interaction risk based on pharmacogenomics."""
+        from medgraph.data.seed_cpic_guidelines import ANCESTRY_ALLELE_FREQUENCIES
+
+        store: GraphStore = app.state.store
+        searcher: DrugSearcher = app.state.searcher
+
+        # Resolve drug names to Drug objects
+        resolved_drugs = []
+        for name in request.drugs:
+            matches = await run_in_threadpool(searcher.search, name, 1)
+            if matches:
+                resolved_drugs.append(matches[0])
+
+        alerts: list[PGxDrugAlert] = []
+        population_risk_factors: list[str] = []
+
+        if request.known_phenotypes:
+            # Direct phenotype match: return alerts for each drug × gene × phenotype
+            for drug in resolved_drugs:
+                for gene_id, phenotype in request.known_phenotypes.items():
+                    guidelines = await run_in_threadpool(
+                        store.get_genetic_guidelines, drug.id, gene_id
+                    )
+                    for gl in guidelines:
+                        if gl.phenotype == phenotype:
+                            pop_freq: float | None = None
+                            if request.ancestry:
+                                pop_freq = (
+                                    ANCESTRY_ALLELE_FREQUENCIES.get(gene_id, {})
+                                    .get(phenotype, {})
+                                    .get(request.ancestry)
+                                )
+                            alerts.append(
+                                PGxDrugAlert(
+                                    drug_name=drug.name,
+                                    gene=gene_id,
+                                    phenotype=phenotype,
+                                    recommendation=gl.recommendation,
+                                    severity_multiplier=gl.severity_multiplier,
+                                    population_frequency=pop_freq,
+                                )
+                            )
+        elif request.ancestry:
+            # Ancestry-only mode: flag high-frequency risk alleles (>= 5%) for each drug
+            for drug in resolved_drugs:
+                all_guidelines = await run_in_threadpool(store.get_guidelines_for_drug, drug.id)
+                for gl in all_guidelines:
+                    freq_map = ANCESTRY_ALLELE_FREQUENCIES.get(gl.gene_id, {}).get(gl.phenotype, {})
+                    pop_freq = freq_map.get(request.ancestry)
+                    if pop_freq is not None and pop_freq >= 0.05:
+                        alerts.append(
+                            PGxDrugAlert(
+                                drug_name=drug.name,
+                                gene=gl.gene_id,
+                                phenotype=gl.phenotype,
+                                recommendation=gl.recommendation,
+                                severity_multiplier=gl.severity_multiplier,
+                                population_frequency=pop_freq,
+                            )
+                        )
+
+        # Build population risk factor strings from ancestry frequencies
+        if request.ancestry:
+            for gene_id, phenotypes in ANCESTRY_ALLELE_FREQUENCIES.items():
+                for phenotype, ancestry_map in phenotypes.items():
+                    freq = ancestry_map.get(request.ancestry)
+                    if freq is not None and freq >= 0.05:
+                        pct = round(freq * 100, 1)
+                        population_risk_factors.append(
+                            f"{request.ancestry.replace('_', ' ').title()} population: "
+                            f"{pct}% carry {gene_id} {phenotype.replace('_', ' ')}"
+                        )
+
+        return PGxRiskResponse(
+            alerts=alerts,
+            ancestry=request.ancestry,
+            population_risk_factors=sorted(set(population_risk_factors)),
+            disclaimer=(
+                "Pharmacogenomics data is for informational purposes only. "
+                "Clinical genetic testing is required for actionable results. "
+                "Always consult a qualified healthcare professional or clinical pharmacist."
+            ),
+        )
 
     # ── Graph & Advanced Analysis Endpoints ──────────────────────────────────
     # Engine modules are provided by another agent; import with graceful fallback.

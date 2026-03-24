@@ -113,6 +113,9 @@ class InteractionResponse(BaseModel):
     evidence_level: str | None = None
     source_citation: str | None = None
     clinical_significance: str | None = None
+    confidence_score: float | None = None
+    confidence_level: str | None = None
+    confidence_factors: list[str] = Field(default_factory=list)
 
 
 class FoodInteractionResponse(BaseModel):
@@ -350,3 +353,37 @@ class OptimizeResponse(BaseModel):
     alternative_regimens: list[dict]
     rationale: str
     disclaimer: str
+
+
+# ── Pharmacogenomics Risk Profile Models ─────────────────────────────────────
+
+
+class PGxRiskRequest(BaseModel):
+    drugs: list[str] = Field(..., min_length=1, max_length=10)
+    ancestry: str | None = Field(
+        None,
+        description=("e.g., european, east_asian, african, south_asian, hispanic, middle_eastern"),
+    )
+    known_phenotypes: dict[str, str] | None = Field(
+        None, description="e.g., {'CYP2D6': 'poor_metabolizer'}"
+    )
+
+
+class PGxDrugAlert(BaseModel):
+    drug_name: str
+    gene: str
+    phenotype: str
+    recommendation: str
+    severity_multiplier: float
+    population_frequency: float | None = None
+
+
+class PGxRiskResponse(BaseModel):
+    alerts: list[PGxDrugAlert]
+    ancestry: str | None
+    population_risk_factors: list[str]
+    disclaimer: str
+
+
+# ── Evidence Confidence Fields (added to InteractionResponse) ─────────────────
+# These fields are appended to InteractionResponse via model extension pattern.

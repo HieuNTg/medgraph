@@ -282,6 +282,63 @@ class RiskScorer:
             "summary": summary,
         }
 
+    def compute_confidence(self, result: DrugInteractionResult) -> dict:
+        """Compute confidence score based on evidence quality.
+
+        Returns:
+            {
+                "score": float (0–100),
+                "level": "high" | "moderate" | "low",
+                "factors": list[str],
+            }
+        """
+        confidence = 0.0
+        factors: list[str] = []
+
+        # Factor 1: Direct interaction exists in DB (vs inferred cascade only)
+        if result.direct_interaction:
+            confidence += 30.0
+            factors.append("Direct interaction documented")
+
+        # Factor 2: Evidence level
+        if result.direct_interaction:
+            level_scores = {"A": 25.0, "B": 20.0, "C": 10.0, "D": 5.0}
+            ev_level = result.direct_interaction.evidence_level or "D"
+            confidence += level_scores.get(ev_level, 5.0)
+            factors.append(f"Evidence level: {ev_level}")
+
+        # Factor 3: FAERS case count
+        ev_count = 0
+        if result.direct_interaction:
+            ev_count = result.direct_interaction.evidence_count
+        for ev in result.evidence:
+            ev_count = max(ev_count, ev.evidence_count)
+        if ev_count >= 100:
+            confidence += 25.0
+            factors.append(f"Strong real-world evidence ({ev_count} FAERS cases)")
+        elif ev_count >= 10:
+            confidence += 15.0
+            factors.append(f"Moderate real-world evidence ({ev_count} FAERS cases)")
+        elif ev_count > 0:
+            confidence += 5.0
+            factors.append(f"Limited real-world evidence ({ev_count} FAERS cases)")
+
+        # Factor 4: Cascade paths confirm mechanism
+        if result.cascade_paths:
+            confidence += 20.0
+            factors.append(
+                f"Mechanistic pathway confirmed ({len(result.cascade_paths)} cascade paths)"
+            )
+
+        confidence = min(100.0, confidence)
+        level = "high" if confidence >= 75 else "moderate" if confidence >= 40 else "low"
+
+        return {
+            "score": round(confidence, 1),
+            "level": level,
+            "factors": factors,
+        }
+
     # -------------------------------------------------------------------------
     # Private helpers
     # -------------------------------------------------------------------------

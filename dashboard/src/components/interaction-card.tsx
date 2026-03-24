@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { CascadePath } from "@/components/cascade-path";
 import { EvidenceBadge } from "@/components/evidence-badge";
 import { EvidencePanel } from "@/components/evidence-panel";
+import { ConfidenceIndicator } from "@/components/confidence-indicator";
 import type { InteractionResult } from "@/lib/types";
 
 interface InteractionCardProps {
@@ -92,6 +93,13 @@ export const InteractionCard = memo(function InteractionCard({ interaction }: In
             </Badge>
             {interaction.evidence_level && (
               <EvidenceBadge level={interaction.evidence_level} />
+            )}
+            {interaction.confidence_score != null && interaction.confidence_level && (
+              <ConfidenceIndicator
+                score={interaction.confidence_score}
+                level={interaction.confidence_level}
+                factors={interaction.confidence_factors ?? []}
+              />
             )}
           </div>
         </div>

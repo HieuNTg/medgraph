@@ -1,0 +1,107 @@
+{
+  "app": {
+    "name": "MEDGRAPH",
+    "tagline": "Phân Tích Chuỗi Tương Tác Thuốc"
+  },
+  "nav": {
+    "home": "Trang Chủ",
+    "checker": "Kiểm Tra Tương Tác",
+    "network": "Mạng Lưới",
+    "about": "Giới Thiệu",
+    "profiles": "Hồ Sơ Thuốc",
+    "history": "Lịch Sử",
+    "login": "Đăng Nhập",
+    "logout": "Đăng Xuất"
+  },
+  "home": {
+    "hero_title": "Phân Tích Chuỗi Tương Tác Thuốc",
+    "hero_subtitle": "Phát hiện chuỗi tương tác thuốc nguy hiểm — không chỉ xung đột trực tiếp — sử dụng đồ thị tri thức dựa trên dữ liệu FDA/dược lý thực tế.",
+    "cta": "Kiểm Tra Ngay",
+    "feature_cascade": "Phát Hiện Chuỗi",
+    "feature_cascade_desc": "Truy vết chuỗi enzyme CYP450, không chỉ tra cứu từng cặp",
+    "feature_evidence": "Bằng Chứng Lâm Sàng",
+    "feature_evidence_desc": "Mỗi tương tác đều có số liệu FDA FAERS",
+    "feature_scoring": "Đánh Giá Rủi Ro",
+    "feature_scoring_desc": "Bốn mức: nhẹ, trung bình, nghiêm trọng, nguy hiểm",
+    "feature_data": "Dữ Liệu Dược Lý Thực",
+    "feature_data_desc": "Từ DrugBank, OpenFDA FAERS và RxNorm"
+  },
+  "checker": {
+    "title": "Kiểm Tra Tương Tác Thuốc",
+    "subtitle": "Nhập thuốc đang sử dụng để kiểm tra tương tác và hiệu ứng chuỗi.",
+    "search_placeholder": "Tìm kiếm thuốc (VD: Warfarin, Aspirin)...",
+    "search_placeholder_add": "Thêm thuốc khác...",
+    "max_reached": "Đã đạt tối đa 10 thuốc",
+    "add_hint_0": "Thêm ít nhất 2 thuốc để kiểm tra tương tác.",
+    "add_hint_1": "Thêm 1 thuốc nữa để kiểm tra.",
+    "add_hint_n": "Đã chọn {{count}} thuốc.",
+    "check_button": "Kiểm Tra Tương Tác",
+    "analyzing": "Đang phân tích..."
+  },
+  "results": {
+    "title": "Kết Quả Phân Tích Tương Tác",
+    "overall_risk": "Rủi Ro Tổng Thể",
+    "interactions_found": "Tìm thấy {{count}} tương tác",
+    "no_interactions": "Không phát hiện tương tác đáng kể.",
+    "cascade_path": "Đường Dẫn Chuỗi",
+    "evidence": "Bằng Chứng",
+    "severity": "Mức Độ",
+    "mechanism": "Cơ Chế",
+    "confidence": "Độ Tin Cậy",
+    "pgx_title": "Cảnh Báo Dược Di Truyền",
+    "back": "Phân Tích Mới"
+  },
+  "about": {
+    "title": "Về MEDGRAPH",
+    "what_is": "MEDGRAPH là gì?",
+    "how_it_works": "Cách Hoạt Động",
+    "data_sources": "Nguồn Dữ Liệu",
+    "disclaimer": "Tuyên Bố Y Khoa"
+  },
+  "disclaimer": {
+    "title": "Tuyên Bố Y Khoa",
+    "text": "Phần mềm này chỉ dành cho mục đích thông tin và giáo dục. MEDGRAPH không phải thiết bị y tế và không cung cấp tư vấn y khoa. Luôn tham khảo ý kiến dược sĩ hoặc bác sĩ trước khi quyết định về thuốc.",
+    "short": "Chỉ dành cho mục đích thông tin. Không phải tư vấn y khoa. Luôn tham khảo ý kiến bác sĩ trước khi quyết định về thuốc.",
+    "full_p1": "MEDGRAPH chỉ dành cho mục đích thông tin và giáo dục. Thông tin được trình bày không cấu thành tư vấn y khoa và không thay thế cho phán đoán, chẩn đoán hoặc điều trị y tế chuyên nghiệp.",
+    "full_p2": "Luôn tìm kiếm lời khuyên của bác sĩ, dược sĩ hoặc nhà cung cấp dịch vụ chăm sóc sức khỏe có trình độ khác nếu bạn có bất kỳ câu hỏi nào về tương tác thuốc, thuốc men hoặc tình trạng y tế. Không bao giờ bỏ qua lời khuyên y tế chuyên nghiệp.",
+    "full_p3": "Dữ liệu tương tác thuốc dựa trên các cơ sở dữ liệu công khai (DrugBank, OpenFDA, RxNorm) và có thể không đầy đủ hoặc cập nhật. Luôn xác minh với nhà cung cấp dịch vụ chăm sóc sức khỏe của bạn."
+  },
+  "auth": {
+    "login": "Đăng Nhập",
+    "register": "Đăng Ký",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "display_name": "Tên hiển thị",
+    "login_button": "Đăng Nhập",
+    "register_button": "Tạo Tài Khoản",
+    "no_account": "Chưa có tài khoản?",
+    "has_account": "Đã có tài khoản?"
+  },
+  "common": {
+    "loading": "Đang tải...",
+    "error": "Đã xảy ra lỗi",
+    "retry": "Thử Lại",
+    "refresh": "Tải Lại Trang",
+    "back": "Quay Lại",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "delete": "Xóa",
+    "search": "Tìm Kiếm",
+    "minor": "Nhẹ",
+    "moderate": "Trung Bình",
+    "major": "Nghiêm Trọng",
+    "critical": "Nguy Hiểm"
+  },
+  "voice": {
+    "not_supported": "Trình duyệt không hỗ trợ nhập giọng nói.",
+    "start": "Bắt đầu nhập giọng nói",
+    "stop": "Dừng nhập giọng nói",
+    "listening": "Đang nghe...",
+    "mic_denied": "Quyền truy cập micro bị từ chối.",
+    "error": "Lỗi nhận dạng giọng nói. Thử lại."
+  },
+  "offline": {
+    "indicator": "Chế Độ Ngoại Tuyến",
+    "message": "Bạn đang ngoại tuyến. Một số tính năng có thể bị hạn chế."
+  }
+}

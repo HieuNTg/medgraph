@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Pill, Shield, Info, Sun, Moon, Menu, X, BookMarked, History, LogIn, LogOut, User } from "lucide-react";
+import { Pill, Shield, Info, Sun, Moon, Menu, X, BookMarked, History, LogIn, LogOut, User, Share2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { MedicalDisclaimer } from "@/components/medical-disclaimer";
 import { OfflineIndicator } from "@/components/offline-indicator";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { useAuth } from "@/lib/auth-context";
 
 function ThemeToggle() {
@@ -38,21 +40,23 @@ function ThemeToggle() {
   );
 }
 
-const STATIC_NAV_LINKS = [
-  { to: "/", label: "Home", icon: null, end: true },
-  { to: "/checker", label: "Check Interactions", icon: Shield, end: false },
-  { to: "/about", label: "About", icon: Info, end: false },
-];
-
-const AUTH_NAV_LINKS = [
-  { to: "/profiles", label: "Profiles", icon: BookMarked, end: false },
-  { to: "/history", label: "History", icon: History, end: false },
-];
-
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+
+  const STATIC_NAV_LINKS = [
+    { to: "/", label: t("nav.home"), icon: null, end: true },
+    { to: "/checker", label: t("nav.checker"), icon: Shield, end: false },
+    { to: "/network", label: t("nav.network"), icon: Share2, end: false },
+    { to: "/about", label: t("nav.about"), icon: Info, end: false },
+  ];
+
+  const AUTH_NAV_LINKS = [
+    { to: "/profiles", label: t("nav.profiles"), icon: BookMarked, end: false },
+    { to: "/history", label: t("nav.history"), icon: History, end: false },
+  ];
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -97,7 +101,7 @@ export function AppShell() {
               ))}
             </nav>
 
-            {/* Right: auth + theme + mobile menu */}
+            {/* Right: auth + language + theme + mobile menu */}
             <div className="flex items-center gap-2">
               <OfflineIndicator />
               {isAuthenticated ? (
@@ -113,7 +117,7 @@ export function AppShell() {
                     className="flex items-center gap-1.5 text-[var(--muted-foreground)]"
                   >
                     <LogOut className="h-3.5 w-3.5" />
-                    Logout
+                    {t("nav.logout")}
                   </Button>
                 </div>
               ) : (
@@ -122,9 +126,10 @@ export function AppShell() {
                   className="hidden md:flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
                 >
                   <LogIn className="h-4 w-4" />
-                  Login
+                  {t("nav.login")}
                 </NavLink>
               )}
+              <LanguageSwitcher />
               <ThemeToggle />
               <button
                 className="md:hidden rounded-md p-2 hover:bg-[var(--accent)] transition-colors"
@@ -164,7 +169,7 @@ export function AppShell() {
                   className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
                 >
                   <LogOut className="h-4 w-4" />
-                  Logout ({user?.display_name ?? user?.email})
+                  {t("nav.logout")} ({user?.display_name ?? user?.email})
                 </button>
               ) : (
                 <NavLink
@@ -173,7 +178,7 @@ export function AppShell() {
                   onClick={() => setMobileOpen(false)}
                 >
                   <LogIn className="h-4 w-4" />
-                  Login
+                  {t("nav.login")}
                 </NavLink>
               )}
             </nav>
@@ -193,7 +198,7 @@ export function AppShell() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-[var(--muted-foreground)]">
             <div className="flex items-center gap-2">
               <Pill className="h-4 w-4" />
-              <span>MEDGRAPH - Drug Interaction Cascade Analyzer</span>
+              <span>MEDGRAPH - {t("app.tagline")}</span>
             </div>
             <p>
               Data sources: DrugBank · OpenFDA · RxNorm

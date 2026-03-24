@@ -1,0 +1,107 @@
+{
+  "app": {
+    "name": "MEDGRAPH",
+    "tagline": "Drug Interaction Cascade Analyzer"
+  },
+  "nav": {
+    "home": "Home",
+    "checker": "Check Interactions",
+    "network": "Network",
+    "about": "About",
+    "profiles": "Profiles",
+    "history": "History",
+    "login": "Login",
+    "logout": "Logout"
+  },
+  "home": {
+    "hero_title": "Drug Interaction Cascade Analyzer",
+    "hero_subtitle": "Detect dangerous multi-drug interaction cascades — not just direct pairwise conflicts — using a knowledge graph built on real FDA/pharmacological data.",
+    "cta": "Check Interactions Now",
+    "feature_cascade": "Cascade Detection",
+    "feature_cascade_desc": "Traces CYP450 enzyme pathway chains, not just pairwise lookups",
+    "feature_evidence": "Evidence Trail",
+    "feature_evidence_desc": "Every interaction backed by FDA FAERS adverse event counts",
+    "feature_scoring": "Risk Scoring",
+    "feature_scoring_desc": "Four severity tiers: minor, moderate, major, critical",
+    "feature_data": "Real Pharmacological Data",
+    "feature_data_desc": "Seeded from DrugBank, OpenFDA FAERS, and RxNorm"
+  },
+  "checker": {
+    "title": "Drug Interaction Checker",
+    "subtitle": "Enter your medications to check for interactions and cascade effects.",
+    "search_placeholder": "Search for a medication (e.g. Warfarin, Aspirin)...",
+    "search_placeholder_add": "Add another medication...",
+    "max_reached": "Maximum 10 drugs reached",
+    "add_hint_0": "Add at least 2 medications to check interactions.",
+    "add_hint_1": "Add 1 more medication to check interactions.",
+    "add_hint_n": "{{count}} medications selected.",
+    "check_button": "Check Interactions",
+    "analyzing": "Analyzing..."
+  },
+  "results": {
+    "title": "Interaction Analysis Results",
+    "overall_risk": "Overall Risk",
+    "interactions_found": "{{count}} interaction(s) found",
+    "no_interactions": "No significant interactions detected.",
+    "cascade_path": "Cascade Path",
+    "evidence": "Evidence",
+    "severity": "Severity",
+    "mechanism": "Mechanism",
+    "confidence": "Confidence",
+    "pgx_title": "Pharmacogenomics Alerts",
+    "back": "New Analysis"
+  },
+  "about": {
+    "title": "About MEDGRAPH",
+    "what_is": "What is MEDGRAPH?",
+    "how_it_works": "How It Works",
+    "data_sources": "Data Sources",
+    "disclaimer": "Medical Disclaimer"
+  },
+  "disclaimer": {
+    "title": "Medical Disclaimer",
+    "text": "This software is for informational and educational purposes only. MEDGRAPH is not a medical device and does not provide medical advice. Always consult a licensed pharmacist or physician before making any medication decisions.",
+    "short": "For informational purposes only. Not medical advice. Always consult your healthcare provider before making any medication decisions.",
+    "full_p1": "MEDGRAPH is provided for informational and educational purposes only. The information presented does not constitute medical advice and is not a substitute for professional medical judgment, diagnosis, or treatment.",
+    "full_p2": "Always seek the advice of your physician, pharmacist, or other qualified healthcare provider with any questions you may have regarding drug interactions, medications, or medical conditions. Never disregard professional medical advice or delay seeking it because of something you have read on this platform.",
+    "full_p3": "Drug interaction data is based on publicly available databases (DrugBank, OpenFDA, RxNorm) and may not be complete or current. Always verify with your healthcare provider."
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "display_name": "Display Name",
+    "login_button": "Sign In",
+    "register_button": "Create Account",
+    "no_account": "Don't have an account?",
+    "has_account": "Already have an account?"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Try Again",
+    "refresh": "Refresh Page",
+    "back": "Back",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "search": "Search",
+    "minor": "Minor",
+    "moderate": "Moderate",
+    "major": "Major",
+    "critical": "Critical"
+  },
+  "voice": {
+    "not_supported": "Voice input not supported in this browser.",
+    "start": "Start voice input",
+    "stop": "Stop voice input",
+    "listening": "Listening...",
+    "mic_denied": "Microphone access denied.",
+    "error": "Voice recognition error. Try again."
+  },
+  "offline": {
+    "indicator": "Offline Mode",
+    "message": "You are currently offline. Some features may be limited."
+  }
+}

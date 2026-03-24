@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { RiskSummary } from "@/components/risk-summary";
 import { InteractionCard } from "@/components/interaction-card";
+import { PGxAlertPanel } from "@/components/pgx-alert";
 import { InteractionGraph } from "@/components/interaction-graph";
 import { PathwayGraph } from "@/components/pathway-graph";
 import { ContraindicationMatrix } from "@/components/contraindication-matrix";
@@ -26,6 +27,7 @@ import type {
   InteractionResult,
   PathwayResponse,
   PolypharmacyResponse,
+  PGxAlert,
 } from "@/lib/types";
 import {
   exportPdfReport,
@@ -51,6 +53,8 @@ function sortBySeverity(interactions: InteractionResult[]): InteractionResult[] 
 interface ResultsState {
   result: CheckResponse;
   metabolizerPhenotypes?: Record<string, string>;
+  pgxAlerts?: PGxAlert[];
+  ancestry?: string | null;
 }
 
 /** Collapsible section wrapper. */
@@ -181,7 +185,7 @@ export function ResultsPage() {
 
   if (!state?.result) return null;
 
-  const { result, metabolizerPhenotypes } = state;
+  const { result, metabolizerPhenotypes, pgxAlerts, ancestry } = state;
 
   const handleExportPdf = async () => {
     setExporting(true);
@@ -314,6 +318,11 @@ export function ResultsPage() {
             </span>
           ))}
         </div>
+      )}
+
+      {/* PGx Alerts */}
+      {pgxAlerts && pgxAlerts.length > 0 && (
+        <PGxAlertPanel alerts={pgxAlerts} ancestry={ancestry} />
       )}
 
       {/* Contraindication Matrix */}
