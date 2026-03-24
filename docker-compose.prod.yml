@@ -84,7 +84,7 @@ services:
       - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
     environment:
       # IMPORTANT: Change this password before deploying monitoring
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme-insecure}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
     ports:

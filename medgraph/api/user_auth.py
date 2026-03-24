@@ -26,6 +26,10 @@ _login_lock = threading.Lock()
 _MAX_LOGIN_ATTEMPTS = 5
 _LOGIN_LOCKOUT_SECONDS = 300  # 5 minutes
 
+# In-memory token blacklist: {jti: expiry_timestamp}
+_revoked_tokens: dict[str, float] = {}
+_revoked_tokens_lock = threading.Lock()
+
 
 def _b64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
@@ -37,6 +41,28 @@ def _b64url_decode(s: str) -> bytes:
     if padding != 4:
         s += "=" * padding
     return base64.urlsafe_b64decode(s)
+
+
+def _revoke_token(jti: str, exp: float) -> None:
+    """Add a JTI to the in-memory revocation blacklist."""
+    with _revoked_tokens_lock:
+        _revoked_tokens[jti] = exp
+
+
+def _is_token_revoked(jti: str) -> bool:
+    """Return True if the JTI is in the revocation blacklist."""
+    with _revoked_tokens_lock:
+        return jti in _revoked_tokens
+
+
+def cleanup_revoked_tokens() -> int:
+    """Remove expired entries from the in-memory blacklist. Returns count removed."""
+    now = time.time()
+    with _revoked_tokens_lock:
+        expired = [jti for jti, exp in _revoked_tokens.items() if exp < now]
+        for jti in expired:
+            del _revoked_tokens[jti]
+    return len(expired)
 
 
 class UserAuth:
@@ -75,7 +101,7 @@ class UserAuth:
     @staticmethod
     def _check_login_rate(email: str) -> None:
         """Raise ValueError if too many failed attempts for this email."""
-        now = time.monotonic()
+        now = time.time()
         with _login_lock:
             if email in _login_attempts:
                 count, first_time = _login_attempts[email]
@@ -88,7 +114,7 @@ class UserAuth:
     @staticmethod
     def _record_failed_login(email: str) -> None:
         """Record a failed login attempt."""
-        now = time.monotonic()
+        now = time.time()
         with _login_lock:
             if email in _login_attempts:
                 count, first_time = _login_attempts[email]
@@ -147,7 +173,7 @@ class UserAuth:
         return f"{signing_input}.{_b64url_encode(sig)}"
 
     def verify_token(self, token: str) -> dict | None:
-        """Verify JWT and return payload dict, or None if invalid/expired."""
+        """Verify JWT and return payload dict, or None if invalid/expired/revoked."""
         try:
             parts = token.split(".")
             if len(parts) != 3:
@@ -162,11 +188,30 @@ class UserAuth:
             if not hmac.compare_digest(expected_sig, actual_sig):
                 return None
             payload = json.loads(_b64url_decode(parts[1]))
-            if payload.get("exp", 0) < datetime.now(timezone.utc).timestamp():
+            now_ts = datetime.now(timezone.utc).timestamp()
+            if payload.get("exp", 0) < now_ts:
+                return None
+            # Check in-memory blacklist
+            jti = payload.get("jti")
+            if jti and _is_token_revoked(jti):
                 return None
             return payload
         except Exception:
             return None
+
+    def logout(self, token: str) -> None:
+        """Revoke an access token by adding its JTI to the in-memory blacklist."""
+        try:
+            parts = token.split(".")
+            if len(parts) != 3:
+                return
+            payload = json.loads(_b64url_decode(parts[1]))
+            jti = payload.get("jti")
+            exp = payload.get("exp", 0)
+            if jti:
+                _revoke_token(jti, float(exp))
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Public API

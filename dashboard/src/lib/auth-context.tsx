@@ -76,6 +76,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  // Proactively refresh token every 10 minutes while authenticated
+  useEffect(() => {
+    if (!user) return;
+    const id = setInterval(() => {
+      const storedRefresh = localStorage.getItem(REFRESH_KEY);
+      if (!storedRefresh) return;
+      apiRefresh(storedRefresh)
+        .then((res) => {
+          localStorage.setItem(TOKEN_KEY, res.access_token);
+          localStorage.setItem(REFRESH_KEY, res.refresh_token);
+          setAuthToken(res.access_token);
+          setUser(res.user);
+        })
+        .catch(() => {
+          // Silently ignore — will retry next interval; don't force logout
+        });
+    }, 600_000);
+    return () => clearInterval(id);
+  }, [user]);
+
   const value = useMemo<AuthState>(
     () => ({
       user,

@@ -367,6 +367,203 @@ def restore(db_path: str, backup_file: str) -> None:
     console.print(f"[bold green]Database restored from:[/] {backup_path}")
 
 
+@cli.command("import-drugbank")
+@click.argument("csv_path")
+@click.option("--db", default="data/medgraph.db", help="Database path", show_default=True)
+@click.option("--batch-size", default=1000, help="Records per transaction", show_default=True)
+def import_drugbank(csv_path: str, db: str, batch_size: int) -> None:
+    """
+    Import full DrugBank open dataset CSV into the database.
+
+    Supports ~2,700 drugs with batch inserts, progress reporting,
+    brand name extraction, drug class categorization, and duplicate detection.
+
+    CSV_PATH: Path to DrugBank vocabulary CSV (drugbank_vocabulary.csv).
+    """
+    from medgraph.data.drugbank import import_drugbank_full
+    from medgraph.graph.store import GraphStore
+
+    db_path = Path(db)
+    store = GraphStore(db_path)
+    counts_before = store.get_counts()
+
+    console.print(
+        Panel(
+            f"[bold blue]MEDGRAPH[/] DrugBank Full Import\n"
+            f"CSV: [cyan]{csv_path}[/]\n"
+            f"Batch size: [cyan]{batch_size}[/]  "
+            f"Current drugs: [cyan]{counts_before['drugs']}[/]",
+            expand=False,
+        )
+    )
+
+    try:
+        stats = import_drugbank_full(
+            store=store,
+            csv_path=Path(csv_path),
+            batch_size=batch_size,
+            show_progress=True,
+        )
+    except FileNotFoundError as exc:
+        console.print(f"[red]Error:[/] {exc}")
+        sys.exit(1)
+
+    counts_after = store.get_counts()
+    console.print(
+        f"\n[bold green]Import complete![/]\n"
+        f"  Inserted: [cyan]{stats['inserted']}[/]\n"
+        f"  Skipped (duplicates): [cyan]{stats['skipped']}[/]\n"
+        f"  Errors: [cyan]{stats['errors']}[/]\n"
+        f"  Total drugs now: [cyan]{counts_after['drugs']}[/]"
+    )
+
+
+@cli.command("refresh")
+@click.option("--db", default="data/medgraph.db", help="Database path", show_default=True)
+@click.option(
+    "--schedule",
+    type=click.Choice(["weekly", "daily"]),
+    default=None,
+    help="Run on a schedule, skipping if data is fresh",
+)
+@click.option(
+    "--sources",
+    default=None,
+    help="Comma-separated sources to refresh (drugbank,openfda)",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Force refresh even if data is fresh",
+)
+def refresh(db: str, schedule: str | None, sources: str | None, force: bool) -> None:
+    """
+    Run data refresh from external sources.
+
+    With --schedule weekly, skips refresh if data is less than 7 days old.
+    With --schedule daily, skips refresh if data is less than 1 day old.
+
+    Example:
+        python -m medgraph.cli refresh --schedule weekly
+        python -m medgraph.cli refresh --sources openfda --force
+    """
+    from medgraph.data.refresh_pipeline import DataRefreshPipeline
+    from medgraph.graph.store import GraphStore
+
+    db_path = Path(db)
+    if not db_path.exists():
+        console.print(
+            f"[red]Database not found:[/] {db_path}\n"
+            "Run [bold]python -m medgraph.cli seed[/] first."
+        )
+        sys.exit(1)
+
+    store = GraphStore(db_path)
+    pipeline = DataRefreshPipeline(store)
+
+    source_list = [s.strip() for s in sources.split(",")] if sources else None
+
+    if schedule:
+        console.print(f"[bold blue]MEDGRAPH[/] Scheduled refresh — [cyan]{schedule}[/]")
+        result = pipeline.schedule_refresh(sources=source_list, schedule=schedule, force=force)
+        if result is None:
+            freshness = pipeline.get_freshness()
+            console.print(
+                f"[dim]Skipped — data is fresh. "
+                f"Last updated: {freshness.get('last_updated', 'unknown')}[/]"
+            )
+            return
+    else:
+        console.print("[bold blue]MEDGRAPH[/] Running data refresh…")
+        result = pipeline.refresh(sources=source_list)
+
+    status_color = "green" if result.success else "red"
+    console.print(
+        f"\n[bold {status_color}]Refresh {'complete' if result.success else 'failed'}![/]\n"
+        f"  Sources attempted: {', '.join(result.sources_attempted)}\n"
+        f"  Succeeded: {', '.join(result.sources_succeeded) or 'none'}\n"
+        f"  Failed: {', '.join(result.sources_failed) or 'none'}\n"
+        f"  Records updated: [cyan]{result.records_updated}[/]"
+    )
+    if result.errors:
+        for src, err in result.errors.items():
+            console.print(f"  [red]  {src}: {err}[/]")
+
+
+@cli.command("enrich-pubmed")
+@click.option("--db", default="data/medgraph.db", help="Database path", show_default=True)
+@click.option(
+    "--max-pairs",
+    default=20,
+    help="Maximum interaction pairs to enrich",
+    show_default=True,
+)
+@click.option(
+    "--max-results",
+    default=5,
+    help="Max PubMed articles per drug pair",
+    show_default=True,
+)
+def enrich_pubmed(db: str, max_pairs: int, max_results: int) -> None:
+    """
+    Enrich drug interactions with PubMed literature evidence.
+
+    Searches NCBI PubMed for published evidence on drug-drug interactions
+    and stores the top articles as evidence sources in the database.
+
+    Rate-limited to <3 requests/second (NCBI free tier).
+    """
+    from medgraph.data.pubmed_agent import PubMedAgent, enrich_interaction
+    from medgraph.graph.store import GraphStore
+
+    db_path = Path(db)
+    if not db_path.exists():
+        console.print(
+            f"[red]Database not found:[/] {db_path}\n"
+            "Run [bold]python -m medgraph.cli seed[/] first."
+        )
+        sys.exit(1)
+
+    store = GraphStore(db_path)
+    agent = PubMedAgent(max_results=max_results)
+
+    # Get top interactions to enrich
+    with store._connect() as conn:
+        rows = conn.execute(
+            "SELECT id, drug_a_id, drug_b_id FROM interactions "
+            "ORDER BY evidence_count ASC LIMIT ?",
+            (max_pairs,),
+        ).fetchall()
+
+    if not rows:
+        console.print("[yellow]No interactions found to enrich.[/]")
+        return
+
+    console.print(
+        Panel(
+            f"[bold blue]MEDGRAPH[/] PubMed Literature Enrichment\n"
+            f"Enriching [cyan]{len(rows)}[/] interaction pairs\n"
+            f"Max articles per pair: [cyan]{max_results}[/]\n"
+            f"\n[dim]Rate-limited to ~3 req/sec. This may take a few minutes.[/]",
+            expand=False,
+        )
+    )
+
+    total_articles = 0
+    for i, row in enumerate(rows, 1):
+        interaction_id, drug_a_id, drug_b_id = row[0], row[1], row[2]
+        console.print(f"  [{i}/{len(rows)}] Enriching {drug_a_id} + {drug_b_id}…", end=" ")
+        articles = enrich_interaction(store, drug_a_id, drug_b_id, agent=agent)
+        console.print(f"[green]{len(articles)} articles[/]")
+        total_articles += len(articles)
+
+    console.print(
+        f"\n[bold green]PubMed enrichment complete![/]\n"
+        f"  Total articles found: [cyan]{total_articles}[/]"
+    )
+
+
 def main() -> None:
     cli()
 

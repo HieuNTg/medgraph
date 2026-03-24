@@ -57,16 +57,30 @@ def reload_api_keys() -> None:
 _request_log: dict[str, list[float]] = defaultdict(list)
 
 
+def _is_trusted_proxy(direct_ip: str) -> bool:
+    """Return True if direct_ip is in MEDGRAPH_TRUSTED_PROXIES env var (comma-separated)."""
+    trusted_raw = os.environ.get("MEDGRAPH_TRUSTED_PROXIES", "").strip()
+    if not trusted_raw:
+        return False
+    trusted = {ip.strip() for ip in trusted_raw.split(",") if ip.strip()}
+    return direct_ip in trusted
+
+
 def _get_client_id(request: Request) -> str:
-    """Derive a rate-limit key from request. Uses API key if present, else IP."""
+    """Derive a rate-limit key from request. Uses API key if present, else IP.
+
+    X-Forwarded-For is only trusted when the direct client IP is in
+    MEDGRAPH_TRUSTED_PROXIES to prevent IP spoofing.
+    """
     api_key = request.headers.get("x-api-key", "")
     if api_key:
-        return f"key:{hashlib.sha256(api_key.encode()).hexdigest()[:32]}"
+        return f"key:{hashlib.sha256(api_key.encode()).hexdigest()}"
+    direct_ip = request.client.host if request.client else "unknown"
     forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
+    if forwarded and _is_trusted_proxy(direct_ip):
         client_ip = forwarded.split(",")[0].strip()
     else:
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = direct_ip
     return f"ip:{client_ip}"
 
 

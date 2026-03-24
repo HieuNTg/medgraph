@@ -1,0 +1,107 @@
+{
+  "app": {
+    "name": "MEDGRAPH",
+    "tagline": "Analizador de Cascadas de Interacciones Farmacológicas"
+  },
+  "nav": {
+    "home": "Inicio",
+    "checker": "Verificar Interacciones",
+    "network": "Red",
+    "about": "Acerca de",
+    "profiles": "Perfiles",
+    "history": "Historial",
+    "login": "Iniciar Sesión",
+    "logout": "Cerrar Sesión"
+  },
+  "home": {
+    "hero_title": "Analizador de Cascadas de Interacciones Farmacológicas",
+    "hero_subtitle": "Detecte cascadas de interacciones peligrosas entre múltiples fármacos — no solo conflictos directos por pares — utilizando un grafo del conocimiento basado en datos reales de la FDA y farmacología.",
+    "cta": "Verificar Interacciones Ahora",
+    "feature_cascade": "Detección de Cascadas",
+    "feature_cascade_desc": "Rastrea cadenas de vías enzimáticas CYP450, no solo búsquedas por pares",
+    "feature_evidence": "Evidencia Científica",
+    "feature_evidence_desc": "Cada interacción respaldada por recuentos de eventos adversos FDA FAERS",
+    "feature_scoring": "Puntuación de Riesgo",
+    "feature_scoring_desc": "Cuatro niveles de gravedad: menor, moderado, grave, crítico",
+    "feature_data": "Datos Farmacológicos Reales",
+    "feature_data_desc": "Basado en DrugBank, OpenFDA FAERS y RxNorm"
+  },
+  "checker": {
+    "title": "Verificador de Interacciones Farmacológicas",
+    "subtitle": "Ingrese sus medicamentos para verificar interacciones y efectos en cascada.",
+    "search_placeholder": "Buscar un medicamento (ej. Warfarina, Aspirina)...",
+    "search_placeholder_add": "Agregar otro medicamento...",
+    "max_reached": "Se alcanzó el máximo de 10 fármacos",
+    "add_hint_0": "Agregue al menos 2 medicamentos para verificar interacciones.",
+    "add_hint_1": "Agregue 1 medicamento más para verificar interacciones.",
+    "add_hint_n": "{{count}} medicamentos seleccionados.",
+    "check_button": "Verificar Interacciones",
+    "analyzing": "Analizando..."
+  },
+  "results": {
+    "title": "Resultados del Análisis de Interacciones",
+    "overall_risk": "Riesgo General",
+    "interactions_found": "{{count}} interacción(es) encontrada(s)",
+    "no_interactions": "No se detectaron interacciones significativas.",
+    "cascade_path": "Vía en Cascada",
+    "evidence": "Evidencia",
+    "severity": "Gravedad",
+    "mechanism": "Mecanismo",
+    "confidence": "Confianza",
+    "pgx_title": "Alertas de Farmacogenómica",
+    "back": "Nuevo Análisis"
+  },
+  "about": {
+    "title": "Acerca de MEDGRAPH",
+    "what_is": "¿Qué es MEDGRAPH?",
+    "how_it_works": "Cómo Funciona",
+    "data_sources": "Fuentes de Datos",
+    "disclaimer": "Aviso Médico"
+  },
+  "disclaimer": {
+    "title": "Aviso Médico",
+    "text": "Este software es solo para fines informativos y educativos. MEDGRAPH no es un dispositivo médico y no proporciona asesoramiento médico. Siempre consulte a un farmacéutico o médico autorizado antes de tomar cualquier decisión sobre medicamentos.",
+    "short": "Solo para fines informativos. No es asesoramiento médico. Siempre consulte a su proveedor de atención médica antes de tomar decisiones sobre medicamentos.",
+    "full_p1": "MEDGRAPH se proporciona únicamente con fines informativos y educativos. La información presentada no constituye asesoramiento médico y no sustituye al juicio médico profesional, diagnóstico o tratamiento.",
+    "full_p2": "Siempre busque el consejo de su médico, farmacéutico u otro proveedor de atención médica calificado ante cualquier pregunta sobre interacciones farmacológicas, medicamentos o condiciones médicas. Nunca ignore el asesoramiento médico profesional ni demore su búsqueda por algo que haya leído en esta plataforma.",
+    "full_p3": "Los datos de interacciones farmacológicas se basan en bases de datos disponibles públicamente (DrugBank, OpenFDA, RxNorm) y pueden no estar completos o actualizados. Siempre verifique con su proveedor de atención médica."
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "register": "Registrarse",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "display_name": "Nombre para Mostrar",
+    "login_button": "Iniciar Sesión",
+    "register_button": "Crear Cuenta",
+    "no_account": "¿No tienes una cuenta?",
+    "has_account": "¿Ya tienes una cuenta?"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ocurrió un error",
+    "retry": "Intentar de Nuevo",
+    "refresh": "Actualizar Página",
+    "back": "Atrás",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "search": "Buscar",
+    "minor": "Menor",
+    "moderate": "Moderado",
+    "major": "Grave",
+    "critical": "Crítico"
+  },
+  "voice": {
+    "not_supported": "La entrada de voz no es compatible con este navegador.",
+    "start": "Iniciar entrada de voz",
+    "stop": "Detener entrada de voz",
+    "listening": "Escuchando...",
+    "mic_denied": "Acceso al micrófono denegado.",
+    "error": "Error de reconocimiento de voz. Inténtelo de nuevo."
+  },
+  "offline": {
+    "indicator": "Modo Sin Conexión",
+    "message": "Actualmente está sin conexión. Algunas funciones pueden estar limitadas."
+  }
+}

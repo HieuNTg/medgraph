@@ -35,6 +35,14 @@ const NetworkPage = lazy(() =>
   import("@/pages/network").then((m) => ({ default: m.NetworkPage }))
 );
 
+const PharmacogenomicsPage = lazy(() =>
+  import("@/pages/pharmacogenomics").then((m) => ({ default: m.PharmacogenomicsPage }))
+);
+
+const SchedulePage = lazy(() =>
+  import("@/pages/schedule").then((m) => ({ default: m.SchedulePage }))
+);
+
 function App() {
   return (
     <ErrorBoundary>
@@ -108,6 +116,22 @@ function App() {
                   element={
                     <Suspense fallback={<AnalysisSkeleton />}>
                       <NetworkPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/pharmacogenomics"
+                  element={
+                    <Suspense fallback={<AnalysisSkeleton />}>
+                      <PharmacogenomicsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/schedule"
+                  element={
+                    <Suspense fallback={<AnalysisSkeleton />}>
+                      <SchedulePage />
                     </Suspense>
                   }
                 />

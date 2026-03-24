@@ -258,6 +258,12 @@ class GraphStore:
                     ON drug_enzyme_relations(enzyme_id);
                 CREATE INDEX IF NOT EXISTS idx_evidence_sources_interaction
                     ON evidence_sources(interaction_id);
+
+                CREATE INDEX IF NOT EXISTS idx_adverse_event_drugs ON adverse_event_drugs(event_id, drug_id);
+                CREATE INDEX IF NOT EXISTS idx_genetic_guidelines_drug_gene ON genetic_guidelines(drug_id, gene_id);
+                CREATE INDEX IF NOT EXISTS idx_food_interactions_drug_id ON food_interactions(drug_id);
+                CREATE INDEX IF NOT EXISTS idx_refresh_tokens_jti ON refresh_tokens(jti);
+                CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
             """)
 
     # -------------------------------------------------------------------------
@@ -415,6 +421,17 @@ class GraphStore:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM drugs WHERE id = ?", (drug_id,)).fetchone()
         return self._row_to_drug(row) if row else None
+
+    def get_drugs_by_ids(self, drug_ids: list[str]) -> dict[str, "Drug"]:
+        """Batch fetch drugs by IDs. Returns {drug_id: Drug} dict."""
+        if not drug_ids:
+            return {}
+        placeholders = ",".join("?" * len(drug_ids))
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM drugs WHERE id IN ({placeholders})", drug_ids
+            ).fetchall()
+        return {r["id"]: self._row_to_drug(r) for r in rows}
 
     def get_drug_by_name(self, name: str) -> Optional[Drug]:
         with self._connect() as conn:
@@ -962,15 +979,97 @@ class GraphStore:
 
     def get_counts(self) -> dict[str, int]:
         with self._connect() as conn:
-            return {
-                "drugs": conn.execute("SELECT COUNT(*) FROM drugs").fetchone()[0],
-                "enzymes": conn.execute("SELECT COUNT(*) FROM enzymes").fetchone()[0],
-                "interactions": conn.execute("SELECT COUNT(*) FROM interactions").fetchone()[0],
-                "drug_enzyme_relations": conn.execute(
-                    "SELECT COUNT(*) FROM drug_enzyme_relations"
-                ).fetchone()[0],
-                "adverse_events": conn.execute("SELECT COUNT(*) FROM adverse_events").fetchone()[0],
-            }
+            row = conn.execute(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM drugs) AS drugs,
+                    (SELECT COUNT(*) FROM enzymes) AS enzymes,
+                    (SELECT COUNT(*) FROM interactions) AS interactions,
+                    (SELECT COUNT(*) FROM drug_enzyme_relations) AS drug_enzyme_relations,
+                    (SELECT COUNT(*) FROM adverse_events) AS adverse_events
+                """
+            ).fetchone()
+        return {
+            "drugs": row["drugs"],
+            "enzymes": row["enzymes"],
+            "interactions": row["interactions"],
+            "drug_enzyme_relations": row["drug_enzyme_relations"],
+            "adverse_events": row["adverse_events"],
+        }
+
+    # -------------------------------------------------------------------------
+    # Evidence Sources (PubMed agent)
+    # -------------------------------------------------------------------------
+
+    def upsert_evidence_source(
+        self,
+        interaction_id: str,
+        source_type: str,
+        source_id: str,
+        title: str,
+        url: str,
+        relevance_score: float,
+    ) -> None:
+        """Insert or update an evidence source for a drug interaction."""
+        with self._connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS evidence_sources (
+                    id               TEXT PRIMARY KEY,
+                    interaction_id   TEXT NOT NULL,
+                    source_type      TEXT NOT NULL,
+                    source_id        TEXT NOT NULL,
+                    title            TEXT NOT NULL,
+                    url              TEXT NOT NULL,
+                    relevance_score  REAL NOT NULL,
+                    created_at       TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_evidence_interaction ON evidence_sources(interaction_id)"
+            )
+            import uuid as _uuid
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc).isoformat()
+            # Composite key: interaction_id + source_type + source_id
+            record_id = f"{interaction_id}:{source_type}:{source_id}"
+            conn.execute(
+                """
+                INSERT INTO evidence_sources
+                    (id, interaction_id, source_type, source_id, title, url, relevance_score, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    title           = excluded.title,
+                    url             = excluded.url,
+                    relevance_score = excluded.relevance_score
+                """,
+                (record_id, interaction_id, source_type, source_id, title, url, relevance_score, now),
+            )
+
+    def get_evidence_sources(self, interaction_id: str) -> list[dict]:
+        """Return all evidence sources for a given interaction ID."""
+        with self._connect() as conn:
+            # Table may not exist yet if upsert was never called
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS evidence_sources (
+                    id               TEXT PRIMARY KEY,
+                    interaction_id   TEXT NOT NULL,
+                    source_type      TEXT NOT NULL,
+                    source_id        TEXT NOT NULL,
+                    title            TEXT NOT NULL,
+                    url              TEXT NOT NULL,
+                    relevance_score  REAL NOT NULL,
+                    created_at       TEXT NOT NULL
+                )
+                """
+            )
+            rows = conn.execute(
+                "SELECT * FROM evidence_sources WHERE interaction_id = ? ORDER BY relevance_score DESC",
+                (interaction_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     # -------------------------------------------------------------------------
     # Refresh Tokens

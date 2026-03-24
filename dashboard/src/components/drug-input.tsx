@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { X, Search, Loader2, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -40,8 +40,9 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
   });
 
   // Filter out already-selected drugs
-  const filteredResults = results.filter(
-    (r) => !selectedDrugs.some((s) => s.id === r.id)
+  const filteredResults = useMemo(
+    () => results.filter((r) => !selectedDrugs.some((s) => s.id === r.id)),
+    [results, selectedDrugs]
   );
 
   // Derive open state — no useEffect needed

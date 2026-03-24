@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Pill, Shield, Info, Sun, Moon, Menu, X, BookMarked, History, LogIn, LogOut, User, Share2 } from "lucide-react";
+import { Pill, Shield, Info, Sun, Moon, Menu, X, BookMarked, History, LogIn, LogOut, User, Share2, Calendar } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { MedicalDisclaimer } from "@/components/medical-disclaimer";
@@ -49,6 +49,7 @@ export function AppShell() {
   const STATIC_NAV_LINKS = [
     { to: "/", label: t("nav.home"), icon: null, end: true },
     { to: "/checker", label: t("nav.checker"), icon: Shield, end: false },
+    { to: "/schedule", label: "Schedule", icon: Calendar, end: false },
     { to: "/network", label: t("nav.network"), icon: Share2, end: false },
     { to: "/about", label: t("nav.about"), icon: Info, end: false },
   ];

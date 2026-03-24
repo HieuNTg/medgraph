@@ -69,7 +69,8 @@ jobs:
             --tb=short \
             --cov=medgraph \
             --cov-report=term-missing \
-            --cov-report=xml
+            --cov-report=xml \
+            --cov-fail-under=70
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -109,6 +110,10 @@ jobs:
         working-directory: dashboard
         run: npm run build
 
+      - name: Run Vitest unit tests
+        working-directory: dashboard
+        run: npm test -- --run
+
   # ── Security scanning ────────────────────────────────────────────────────────
   security:
     runs-on: ubuntu-latest
@@ -118,11 +123,11 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install security tools
-        run: pip install bandit safety
+        run: pip install bandit pip-audit
       - name: Run bandit (Python security linter)
-        run: bandit -r medgraph/ -ll -ii --skip B101
+        run: bandit -r medgraph/ -l -ii --skip B101
       - name: Check dependencies for vulnerabilities
-        run: safety check --bare || true
+        run: pip-audit
 
   # ── Docker build validation ─────────────────────────────────────────────────
   docker-build:

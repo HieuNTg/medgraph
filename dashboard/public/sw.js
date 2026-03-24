@@ -69,7 +69,10 @@ async function cacheFirst(request) {
       const cached = await caches.match("/index.html");
       if (cached) return cached;
     }
-    return new Response("Offline", { status: 503 });
+    return new Response(
+      "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Offline — MEDGRAPH</title></head><body><h1>You are offline.</h1><p>Please check your connection and try again.</p></body></html>",
+      { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } }
+    );
   }
 }
 

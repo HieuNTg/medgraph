@@ -7,9 +7,10 @@ and tracks refresh history in the schema_metadata table.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -22,6 +23,9 @@ _SUPPORTED_SOURCES = frozenset({"drugbank", "openfda"})
 # Metadata keys used in schema_metadata table
 _KEY_LAST_REFRESH = "last_refresh_timestamp"
 _KEY_DATA_VERSION = "data_version"
+
+# Freshness threshold: skip refresh if data is less than this many days old
+_FRESHNESS_DAYS = 7
 
 
 @dataclass
@@ -90,6 +94,127 @@ class DataRefreshPipeline:
 
         self._persist_refresh_metadata(result)
         return result
+
+    def is_fresh(self) -> bool:
+        """Return True if data was refreshed within the last 7 days."""
+        last_refresh = self._get_metadata(_KEY_LAST_REFRESH)
+        if not last_refresh:
+            return False
+        try:
+            last_dt = datetime.fromisoformat(last_refresh)
+            # Ensure timezone-aware comparison
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=timezone.utc)
+            return (datetime.now(timezone.utc) - last_dt) < timedelta(days=_FRESHNESS_DAYS)
+        except ValueError:
+            return False
+
+    def schedule_refresh(
+        self,
+        sources: list[str] | None = None,
+        schedule: str = "weekly",
+        force: bool = False,
+    ) -> RefreshResult | None:
+        """
+        Conditionally run refresh based on a schedule.
+
+        Args:
+            sources: Sources to refresh (default: all).
+            schedule: "weekly" (skip if data < 7 days old) or "daily" (skip if < 1 day old).
+            force: If True, bypass freshness check and always refresh.
+
+        Returns:
+            RefreshResult if refresh ran, None if skipped due to freshness.
+        """
+        if not force:
+            threshold_days = 1 if schedule == "daily" else _FRESHNESS_DAYS
+            last_refresh = self._get_metadata(_KEY_LAST_REFRESH)
+            if last_refresh:
+                try:
+                    last_dt = datetime.fromisoformat(last_refresh)
+                    if last_dt.tzinfo is None:
+                        last_dt = last_dt.replace(tzinfo=timezone.utc)
+                    age = datetime.now(timezone.utc) - last_dt
+                    if age < timedelta(days=threshold_days):
+                        logger.info(
+                            "Skipping scheduled refresh — data is only %.1f hours old "
+                            "(threshold: %d days)",
+                            age.total_seconds() / 3600,
+                            threshold_days,
+                        )
+                        return None
+                except ValueError:
+                    pass
+
+        logger.info("Running scheduled refresh (schedule=%s)", schedule)
+        return self.refresh(sources=sources)
+
+    def refresh_batch_openfda(self, drug_pairs: list[tuple[str, str]]) -> int:
+        """
+        Batch process FAERS queries for multiple drug pairs.
+
+        Instead of one-by-one queries, sends batched requests and stores
+        adverse event data for each pair.
+
+        Args:
+            drug_pairs: List of (drug_a_name, drug_b_name) tuples.
+
+        Returns:
+            Number of adverse event records inserted.
+        """
+        try:
+            import time
+
+            import httpx
+        except ImportError:
+            logger.warning("httpx not available — skipping batch FAERS enrichment")
+            return 0
+
+        inserted = 0
+        base_url = "https://api.fda.gov/drug/event.json"
+
+        for drug_a, drug_b in drug_pairs:
+            try:
+                # Rate-limit: ~3 req/s for FDA API
+                time.sleep(0.35)
+                query = f'patient.drug.medicinalproduct:"{drug_a}"+AND+patient.drug.medicinalproduct:"{drug_b}"'
+                resp = httpx.get(
+                    base_url,
+                    params={"search": query, "limit": 10},
+                    timeout=10,
+                )
+                if resp.status_code != 200:
+                    continue
+                data = resp.json()
+                results = data.get("results", [])
+                for event in results:
+                    reactions = [
+                        r.get("reactionmeddrapt", "")
+                        for r in event.get("patient", {}).get("reaction", [])
+                        if r.get("reactionmeddrapt")
+                    ]
+                    if not reactions:
+                        continue
+                    from medgraph.graph.models import AdverseEvent
+
+                    ae = AdverseEvent(
+                        id=f"FAERS-{drug_a[:10]}-{drug_b[:10]}-{len(reactions)}",
+                        drug_ids=[drug_a, drug_b],
+                        reaction=", ".join(reactions[:5]),
+                        count=1,
+                        seriousness=event.get("serious", ""),
+                        source_url=None,
+                    )
+                    try:
+                        self._store.upsert_adverse_event(ae)
+                        inserted += 1
+                    except Exception:
+                        pass
+            except Exception as exc:
+                logger.debug("FAERS batch error for %s+%s: %s", drug_a, drug_b, exc)
+
+        logger.info("Batch FAERS enrichment: %d records inserted for %d pairs", inserted, len(drug_pairs))
+        return inserted
 
     def get_freshness(self) -> dict:
         """

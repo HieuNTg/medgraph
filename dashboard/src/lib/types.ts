@@ -49,6 +49,16 @@ export interface Evidence {
   url: string | null;
 }
 
+export interface FoodInteractionResponse {
+  food_name: string;
+  food_category: string;
+  drug_id: string;
+  severity: string;
+  description: string;
+  mechanism: string | null;
+  evidence_level: string;
+}
+
 export interface CheckResponse {
   drugs: Drug[];
   interactions: InteractionResult[];
@@ -58,6 +68,7 @@ export interface CheckResponse {
   interaction_count: number;
   timestamp: string;
   disclaimer: string;
+  food_interactions?: FoodInteractionResponse[];
 }
 
 export interface SearchResult {
@@ -193,4 +204,17 @@ export interface ConfidenceInfo {
   score: number;
   level: string;
   factors: string[];
+}
+
+// ── Schedule Types ────────────────────────────────────────────────────────────
+
+export interface ScheduleSlot {
+  time: string;
+  label: string;
+  drugs: string[];
+}
+
+export interface ScheduleResponse {
+  slots: ScheduleSlot[];
+  warnings: string[];
 }

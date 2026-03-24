@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -20,6 +20,8 @@ import { PathwayGraph } from "@/components/pathway-graph";
 import { ContraindicationMatrix } from "@/components/contraindication-matrix";
 import { DeprescribingPanel } from "@/components/deprescribing-panel";
 import { PolypharmacyGauge } from "@/components/polypharmacy-gauge";
+import { FoodInteractionTimeline } from "@/components/food-interaction-timeline";
+import type { FoodInteraction as FoodInteractionTimelineItem } from "@/components/food-interaction-timeline";
 import type {
   CheckResponse,
   ContraindicationResponse,
@@ -211,7 +213,10 @@ export function ResultsPage() {
     }
   };
 
-  const sorted = sortBySeverity(result.interactions);
+  const sorted = useMemo(
+    () => sortBySeverity(result.interactions),
+    [result.interactions]
+  );
   const hasGraphData =
     result.drugs.some((d) => d.enzyme_relations.length > 0) ||
     result.interactions.some((i) => i.cascade_paths.length > 0);
@@ -372,6 +377,29 @@ export function ResultsPage() {
             your medications.
           </p>
         </div>
+      )}
+
+      {/* Food Interaction Timeline */}
+      {result.food_interactions && result.food_interactions.length > 0 && (
+        <CollapsibleSection
+          title="Food Interaction Timeline"
+          defaultOpen={false}
+        >
+          <FoodInteractionTimeline
+            drugs={result.drugs.map((d) => ({ id: d.id, name: d.name }))}
+            foodInteractions={result.food_interactions.map(
+              (fi): FoodInteractionTimelineItem => ({
+                drug_id: fi.drug_id,
+                drug_name:
+                  result.drugs.find((d) => d.id === fi.drug_id)?.name ?? fi.drug_id,
+                food_item: fi.food_name,
+                severity: fi.severity as FoodInteractionTimelineItem["severity"],
+                description: fi.description,
+                timing_note: fi.mechanism ?? undefined,
+              })
+            )}
+          />
+        </CollapsibleSection>
       )}
 
       {/* Deprescribing Panel */}

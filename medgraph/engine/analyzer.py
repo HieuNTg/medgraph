@@ -68,11 +68,12 @@ class CascadeAnalyzer:
         if not drug_ids:
             return self._empty_report([])
 
-        # Resolve drugs from store
+        # Resolve drugs from store — batch fetch (avoids N+1 queries)
+        drug_batch = store.get_drugs_by_ids(drug_ids)
         drugs: list[Drug] = []
         resolved_ids: list[str] = []
         for drug_id in drug_ids:
-            drug = store.get_drug_by_id(drug_id)
+            drug = drug_batch.get(drug_id)
             if drug:
                 drugs.append(drug)
                 resolved_ids.append(drug_id)

@@ -9,6 +9,7 @@ import type {
   MedicationProfile,
   OptimizationResult,
   PathwayResponse,
+  ScheduleResponse,
   SearchResult,
   TokenResponse,
   User,
@@ -197,6 +198,15 @@ export function shareResult(
 
 export function getSharedResult(token: string): Promise<CheckResponse> {
   return apiFetch(`/api/share/${token}`);
+}
+
+export function getSchedule(
+  drugs: { name: string; frequency: number }[]
+): Promise<ScheduleResponse> {
+  return apiFetch("/api/v1/schedule", {
+    method: "POST",
+    body: JSON.stringify({ drugs }),
+  });
 }
 
 export async function exportPdfReport(

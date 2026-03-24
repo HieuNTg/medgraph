@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef } from "react";
+import { lazy, Suspense, useCallback, useRef } from "react";
 import {
   AlertOctagon,
   AlertTriangle,
@@ -88,7 +88,7 @@ export function RiskSummary({ response }: RiskSummaryProps) {
     })
   );
 
-  const handleExport = async () => {
+  const handleExport = useCallback(async () => {
     if (!summaryRef.current) return;
     try {
       const { default: html2canvas } = await import("html2canvas");
@@ -103,7 +103,7 @@ export function RiskSummary({ response }: RiskSummaryProps) {
     } catch (err) {
       console.error("Export failed:", err);
     }
-  };
+  }, []);
 
   const timestamp = new Date(response.timestamp).toLocaleString();
 

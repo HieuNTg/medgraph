@@ -18,6 +18,7 @@ Endpoints:
     POST /auth/register                                 — Register new user
     POST /auth/login                                    — Login and receive JWT tokens
     POST /auth/refresh                                  — Refresh access token
+    POST /auth/logout                                   — Logout and blacklist access token
     GET  /auth/me                                       — Get current user info
 
     POST   /api/v1/profiles                             — Create medication profile
@@ -89,6 +90,9 @@ from medgraph.api.models import (
     OptimizeRequest,
     OptimizeResponse,
     PaginatedResponse,
+    ScheduleRequest,
+    ScheduleResponse,
+    ScheduledDrugResponse,
     PathwayEdge,
     PathwayNode,
     PathwayResponse,
@@ -154,6 +158,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.stats_cache = (None, 0.0)
     app.state.user_auth = user_auth
     app.state.audit_logger = audit_logger
+    app.state.enzymes = {e.id: e for e in store.get_all_enzymes()}
 
     counts = store.get_counts()
     # Set Prometheus gauges
@@ -566,8 +571,11 @@ def create_app() -> FastAPI:
             report.overall_score = analyzer.scorer.score_report(report)
             report.overall_risk = analyzer.scorer.classify_severity(report.overall_score)
 
-        # Build enzyme name cache (avoid repeated full enzyme lookups)
-        enzymes_by_id = {e.id: e for e in store.get_all_enzymes()}
+        # Use startup-cached enzyme lookup dict (fall back to DB query if not cached)
+        try:
+            enzymes_by_id = http_request.app.state.enzymes
+        except AttributeError:
+            enzymes_by_id = {e.id: e for e in store.get_all_enzymes()}
 
         drugs_response = [_build_drug_response(d, store, enzymes_by_id) for d in report.drugs]
 
@@ -932,7 +940,7 @@ def create_app() -> FastAPI:
         edges: list[PathwayEdge] = []
         cascades: list[dict] = []
 
-        enzymes_by_id = {e.id: e for e in store.get_all_enzymes()}
+        enzymes_by_id = app.state.enzymes
 
         for drug_id in drug_ids:
             drug = store.get_drug_by_id(drug_id)
@@ -1123,6 +1131,20 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=401, detail=str(exc))
         return TokenResponse(**result)
+
+    @auth_router.post("/logout")
+    async def logout(
+        credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    ) -> dict:
+        if credentials is None:
+            raise HTTPException(status_code=401, detail="Authorization header required")
+        user_auth: UserAuth = app.state.user_auth
+        # Verify the token is valid before blacklisting
+        payload = user_auth.verify_token(credentials.credentials)
+        if payload is None:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        user_auth.logout(credentials.credentials)
+        return {"message": "Logged out successfully"}
 
     @auth_router.get("/me", response_model=UserResponse)
     async def get_me(user: dict = Depends(require_current_user)) -> UserResponse:
@@ -1418,6 +1440,73 @@ def create_app() -> FastAPI:
             disclaimer=result.disclaimer,
         )
 
+    # ── Medication Schedule Optimizer ─────────────────────────────────────
+
+    @router.post(
+        "/schedule",
+        response_model=ScheduleResponse,
+        tags=["analysis"],
+        dependencies=_api_deps,
+    )
+    async def optimize_schedule(request: ScheduleRequest) -> ScheduleResponse:
+        """
+        Compute an optimized medication schedule that minimizes interaction windows.
+
+        Assigns each drug to time slots (morning/noon/evening/night) so that
+        interacting drugs are spaced at least 4 hours apart.
+        """
+        store: GraphStore = app.state.store
+        searcher: DrugSearcher = app.state.searcher
+
+        # Resolve drug names → Drug objects
+        drug_inputs: list[dict] = []
+        unresolved: list[str] = []
+        for drug_input in request.drugs:
+            matches = await run_in_threadpool(searcher.search, drug_input.drug_name, 5)
+            if matches:
+                drug_inputs.append(
+                    {
+                        "drug_id": matches[0].id,
+                        "drug_name": matches[0].name,
+                        "frequency": drug_input.frequency,
+                    }
+                )
+            else:
+                unresolved.append(drug_input.drug_name)
+
+        if unresolved:
+            raise HTTPException(
+                status_code=400,
+                detail={"message": "Some drugs were not found", "unresolved": unresolved},
+            )
+
+        from medgraph.engine.schedule_optimizer import ScheduleOptimizer
+
+        optimizer = ScheduleOptimizer(store=store)
+        try:
+            result = await run_in_threadpool(optimizer.optimize, drug_inputs)
+        except Exception as exc:
+            logger.exception("Schedule optimizer error: %s", exc)
+            raise HTTPException(status_code=503, detail="Schedule optimizer failed")
+
+        # Convert to response model
+        schedule_response: dict[str, list[ScheduledDrugResponse]] = {}
+        for slot, drugs in result.schedule.items():
+            schedule_response[slot] = [
+                ScheduledDrugResponse(
+                    drug_id=d.drug_id,
+                    drug_name=d.drug_name,
+                    frequency=d.frequency,
+                )
+                for d in drugs
+            ]
+
+        return ScheduleResponse(
+            schedule=schedule_response,
+            warnings=result.warnings,
+            disclaimer=result.disclaimer,
+        )
+
     # ── Audit Endpoint ────────────────────────────────────────────────────
 
     @router.get(
@@ -1528,7 +1617,7 @@ def create_app() -> FastAPI:
             report = analyzer.analyze(drug_ids, graph, store)
             ANALYSIS_DURATION.observe(time.perf_counter() - _t0)
 
-            enzymes_by_id = {e.id: e for e in store.get_all_enzymes()}
+            enzymes_by_id = app.state.enzymes
 
             def _drug_resp(drug) -> DrugResponse:
                 return _build_drug_response(drug, store, enzymes_by_id)

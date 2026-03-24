@@ -53,13 +53,12 @@ export async function checkOffline(
 
   const rawInteractions = await store.getInteractions(drugIds);
 
-  // Map drug IDs to names for display
+  // Map drug IDs to names for display — single fetch, then lookup from result
   const drugNames: Record<string, string> = {};
+  const allDrugs = await store.getAllDrugs();
+  const drugLookup = new Map(allDrugs.map((d) => [d.id, d.name]));
   for (const id of drugIds) {
-    const results = await store.searchDrugs("");
-    const match = results.find((d) => d.id === id);
-    if (match) drugNames[id] = match.name;
-    else drugNames[id] = id;
+    drugNames[id] = drugLookup.get(id) ?? id;
   }
 
   const interactions = rawInteractions.map((i) => ({

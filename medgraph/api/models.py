@@ -385,5 +385,37 @@ class PGxRiskResponse(BaseModel):
     disclaimer: str
 
 
+# ── Schedule Optimizer Models ─────────────────────────────────────────────────
+
+
+class ScheduleDrugInput(BaseModel):
+    """A drug with its dosing frequency for schedule optimization."""
+
+    drug_name: str = Field(..., description="Drug name to search")
+    frequency: int = Field(1, ge=1, le=3, description="Doses per day (1, 2, or 3)")
+
+
+class ScheduledDrugResponse(BaseModel):
+    """A drug assigned to a time slot."""
+
+    drug_id: str
+    drug_name: str
+    frequency: int
+
+
+class ScheduleRequest(BaseModel):
+    """Request body for POST /api/v1/schedule."""
+
+    drugs: list[ScheduleDrugInput] = Field(..., min_length=2, max_length=10)
+
+
+class ScheduleResponse(BaseModel):
+    """Optimised medication schedule response."""
+
+    schedule: dict[str, list[ScheduledDrugResponse]]  # time_slot → drugs
+    warnings: list[str]
+    disclaimer: str
+
+
 # ── Evidence Confidence Fields (added to InteractionResponse) ─────────────────
 # These fields are appended to InteractionResponse via model extension pattern.

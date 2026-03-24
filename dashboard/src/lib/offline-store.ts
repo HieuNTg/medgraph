@@ -90,16 +90,29 @@ export class OfflineStore {
       req.onsuccess = () => {
         const all: OfflineDrug[] = req.result;
         if (!query.trim()) {
-          resolve(all.slice(0, 20));
+          resolve(all.slice(0, 100));
           return;
         }
         const lower = query.toLowerCase();
         const matches = all
           .filter((d) => d.name.toLowerCase().includes(lower))
-          .slice(0, 20);
+          .slice(0, 100);
         resolve(matches);
       };
 
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async getAllDrugs(): Promise<OfflineDrug[]> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db!.transaction(STORE_DRUGS, "readonly");
+      const store = tx.objectStore(STORE_DRUGS);
+      const req = store.getAll();
+
+      req.onsuccess = () => resolve(req.result as OfflineDrug[]);
       req.onerror = () => reject(req.error);
     });
   }

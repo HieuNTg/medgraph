@@ -16,30 +16,30 @@ describe("DrugInput", () => {
   it("renders search input", () => {
     renderWithProviders(<DrugInput onSubmit={() => {}} />);
     expect(
-      screen.getByLabelText("Search medications")
+      screen.getByLabelText("common.search")
     ).toBeInTheDocument();
   });
 
   it("shows hint text for no selection", () => {
     renderWithProviders(<DrugInput onSubmit={() => {}} />);
     expect(
-      screen.getByText("Add at least 2 medications to check interactions.")
+      screen.getByText("checker.add_hint_0")
     ).toBeInTheDocument();
   });
 
   it("disables submit button with fewer than 2 drugs", () => {
     renderWithProviders(<DrugInput onSubmit={() => {}} />);
-    expect(screen.getByText("Check Interactions")).toBeDisabled();
+    expect(screen.getByText("checker.check_button")).toBeDisabled();
   });
 
   it("shows loading state when loading prop is true", () => {
     renderWithProviders(<DrugInput onSubmit={() => {}} loading />);
-    expect(screen.getByText("Analyzing...")).toBeInTheDocument();
+    expect(screen.getByText("checker.analyzing")).toBeInTheDocument();
   });
 
   it("has correct aria attributes on input", () => {
     renderWithProviders(<DrugInput onSubmit={() => {}} />);
-    const input = screen.getByLabelText("Search medications");
+    const input = screen.getByLabelText("common.search");
     expect(input).toHaveAttribute("aria-autocomplete", "list");
   });
 
@@ -47,7 +47,7 @@ describe("DrugInput", () => {
     const user = userEvent.setup();
     renderWithProviders(<DrugInput onSubmit={() => {}} />);
 
-    const input = screen.getByLabelText("Search medications");
+    const input = screen.getByLabelText("common.search");
     await user.type(input, "war");
 
     // Wait for debounce + query
@@ -63,7 +63,7 @@ describe("DrugInput", () => {
     const user = userEvent.setup();
     renderWithProviders(<DrugInput onSubmit={() => {}} />);
 
-    const input = screen.getByLabelText("Search medications");
+    const input = screen.getByLabelText("common.search");
     await user.type(input, "war");
 
     await waitFor(

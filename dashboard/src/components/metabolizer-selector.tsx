@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Dna } from "lucide-react";
 
-const CYP_GENES = [
+export const CYP_GENES = [
   {
     id: "CYP2D6",
     label: "CYP2D6",
@@ -13,9 +13,24 @@ const CYP_GENES = [
     label: "CYP2C19",
     description: "Metabolizes PPIs, clopidogrel, some SSRIs",
   },
+  {
+    id: "CYP3A4",
+    label: "CYP3A4",
+    description: "Metabolizes ~50% of all drugs; major hepatic CYP enzyme",
+  },
+  {
+    id: "CYP2C9",
+    label: "CYP2C9",
+    description: "Metabolizes warfarin, NSAIDs, some antidiabetics",
+  },
+  {
+    id: "CYP1A2",
+    label: "CYP1A2",
+    description: "Metabolizes clozapine, caffeine, theophylline; induced by smoking",
+  },
 ] as const;
 
-const PHENOTYPES = [
+export const PHENOTYPES = [
   {
     value: "poor",
     label: "Poor",

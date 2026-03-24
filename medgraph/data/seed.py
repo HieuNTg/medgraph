@@ -11,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -158,21 +159,111 @@ class DataSeeder:
     # Private seed methods
     # -------------------------------------------------------------------------
 
+    # -------------------------------------------------------------------------
+    # Batch helpers — single transaction per dataset for atomicity & speed
+    # -------------------------------------------------------------------------
+
+    def _batch_upsert_drugs(self, drugs: list[Drug]) -> None:
+        """Insert/update a list of Drug objects in a single transaction."""
+        if not drugs:
+            return
+        rows = [
+            (
+                d.id, d.name, json.dumps(d.brand_names), d.description,
+                d.drug_class, d.rxnorm_cui, d.category, d.last_updated, d.atc_code,
+            )
+            for d in drugs
+        ]
+        with self.store._connect() as conn:
+            conn.executemany(
+                """
+                INSERT INTO drugs (id, name, brand_names, description, drug_class,
+                                   rxnorm_cui, category, last_updated, atc_code)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name         = excluded.name,
+                    brand_names  = excluded.brand_names,
+                    description  = excluded.description,
+                    drug_class   = excluded.drug_class,
+                    rxnorm_cui   = excluded.rxnorm_cui,
+                    category     = excluded.category,
+                    last_updated = excluded.last_updated,
+                    atc_code     = excluded.atc_code
+                """,
+                rows,
+            )
+
+    def _batch_upsert_interactions(self, interactions: list[Interaction]) -> None:
+        """Insert/update a list of Interaction objects in a single transaction."""
+        if not interactions:
+            return
+        rows = [
+            (
+                i.id, i.drug_a_id, i.drug_b_id, i.severity, i.description,
+                i.mechanism, i.source, i.evidence_count, i.evidence_level,
+                i.source_citation, i.last_updated, i.clinical_significance,
+            )
+            for i in interactions
+        ]
+        with self.store._connect() as conn:
+            conn.executemany(
+                """
+                INSERT INTO interactions
+                    (id, drug_a_id, drug_b_id, severity, description, mechanism, source,
+                     evidence_count, evidence_level, source_citation, last_updated,
+                     clinical_significance)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    severity              = excluded.severity,
+                    description           = excluded.description,
+                    mechanism             = excluded.mechanism,
+                    source                = excluded.source,
+                    evidence_count        = excluded.evidence_count,
+                    evidence_level        = excluded.evidence_level,
+                    source_citation       = excluded.source_citation,
+                    last_updated          = excluded.last_updated,
+                    clinical_significance = excluded.clinical_significance
+                """,
+                rows,
+            )
+
+    def _batch_upsert_enzyme_relations(self, relations: list[DrugEnzymeRelation]) -> None:
+        """Insert/update a list of DrugEnzymeRelation objects in a single transaction."""
+        if not relations:
+            return
+        rows = [
+            (r.drug_id, r.enzyme_id, r.relation_type, r.strength)
+            for r in relations
+        ]
+        with self.store._connect() as conn:
+            conn.executemany(
+                """
+                INSERT INTO drug_enzyme_relations (drug_id, enzyme_id, relation_type, strength)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(drug_id, enzyme_id, relation_type) DO UPDATE SET
+                    strength = excluded.strength
+                """,
+                rows,
+            )
+
+    # -------------------------------------------------------------------------
+    # Seed methods
+    # -------------------------------------------------------------------------
+
     def _seed_enzymes(self) -> None:
         for e in sd.ENZYMES:
             self.store.upsert_enzyme(Enzyme(**e))
 
     def _seed_builtin_drugs(self) -> None:
-        for d in sd.DRUGS:
-            self.store.upsert_drug(Drug(**d))
+        self._batch_upsert_drugs([Drug(**d) for d in sd.DRUGS])
 
     def _seed_builtin_interactions(self) -> None:
-        for i in sd.INTERACTIONS:
-            self.store.upsert_interaction(Interaction(**i))
+        self._batch_upsert_interactions([Interaction(**i) for i in sd.INTERACTIONS])
 
     def _seed_builtin_enzyme_relations(self) -> None:
-        for r in sd.DRUG_ENZYME_RELATIONS:
-            self.store.upsert_drug_enzyme_relation(DrugEnzymeRelation(**r))
+        self._batch_upsert_enzyme_relations(
+            [DrugEnzymeRelation(**r) for r in sd.DRUG_ENZYME_RELATIONS]
+        )
 
     def _seed_builtin_adverse_events(self) -> None:
         for e in sd.ADVERSE_EVENTS:
@@ -189,8 +280,7 @@ class DataSeeder:
         try:
             from medgraph.data.seed_drugs_expanded import DRUGS_EXPANDED
 
-            for d in DRUGS_EXPANDED:
-                self.store.upsert_drug(Drug(**d))
+            self._batch_upsert_drugs([Drug(**d) for d in DRUGS_EXPANDED])
         except ImportError:
             logger.debug("seed_drugs_expanded not available — skipping")
 
@@ -201,10 +291,10 @@ class DataSeeder:
                 DRUG_ENZYME_RELATIONS_EXPANDED,
             )
 
-            for i in INTERACTIONS_EXPANDED:
-                self.store.upsert_interaction(Interaction(**i))
-            for r in DRUG_ENZYME_RELATIONS_EXPANDED:
-                self.store.upsert_drug_enzyme_relation(DrugEnzymeRelation(**r))
+            self._batch_upsert_interactions([Interaction(**i) for i in INTERACTIONS_EXPANDED])
+            self._batch_upsert_enzyme_relations(
+                [DrugEnzymeRelation(**r) for r in DRUG_ENZYME_RELATIONS_EXPANDED]
+            )
         except ImportError:
             logger.debug("seed_interactions_expanded not available — skipping")
 
@@ -212,8 +302,7 @@ class DataSeeder:
         try:
             from medgraph.data.seed_drugs_extended import DRUGS_EXTENDED
 
-            for d in DRUGS_EXTENDED:
-                self.store.upsert_drug(Drug(**d))
+            self._batch_upsert_drugs([Drug(**d) for d in DRUGS_EXTENDED])
         except ImportError:
             logger.debug("seed_drugs_extended not available — skipping")
 
@@ -224,10 +313,10 @@ class DataSeeder:
                 DRUG_ENZYME_RELATIONS_EXTENDED,
             )
 
-            for i in INTERACTIONS_EXTENDED:
-                self.store.upsert_interaction(Interaction(**i))
-            for r in DRUG_ENZYME_RELATIONS_EXTENDED:
-                self.store.upsert_drug_enzyme_relation(DrugEnzymeRelation(**r))
+            self._batch_upsert_interactions([Interaction(**i) for i in INTERACTIONS_EXTENDED])
+            self._batch_upsert_enzyme_relations(
+                [DrugEnzymeRelation(**r) for r in DRUG_ENZYME_RELATIONS_EXTENDED]
+            )
         except ImportError:
             logger.debug("seed_interactions_extended not available — skipping")
 
