@@ -4,8 +4,6 @@ Audit logging service for MEDGRAPH.
 Records user actions to the audit_log table for compliance and debugging.
 """
 
-from __future__ import annotations
-
 import uuid
 from datetime import datetime, timezone
 

@@ -2,10 +2,8 @@
 FastAPI request/response models for MEDGRAPH API.
 """
 
-from __future__ import annotations
-
 import re
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, field_validator
 
@@ -22,7 +20,7 @@ _MAX_PNG_B64_LEN = 5 * 1024 * 1024
 class CheckRequest(BaseModel):
     drugs: list[str]
     include_evidence: bool = True
-    metabolizer_phenotypes: Optional[dict[str, str]] = None
+    metabolizer_phenotypes: dict[str, str] | None = None
 
     @field_validator("drugs")
     @classmethod
@@ -45,7 +43,7 @@ class CheckRequest(BaseModel):
 
     @field_validator("metabolizer_phenotypes")
     @classmethod
-    def validate_phenotypes(cls, v: Optional[dict[str, str]]) -> Optional[dict[str, str]]:
+    def validate_phenotypes(cls, v: dict[str, str] | None) -> dict[str, str] | None:
         if v is None:
             return v
         for gene, phenotype in v.items():
@@ -67,10 +65,10 @@ class DrugResponse(BaseModel):
     id: str
     name: str
     brand_names: list[str]
-    drug_class: Optional[str]
+    drug_class: str | None
     enzyme_relations: list[EnzymeRelationResponse] = []
-    category: Optional[str] = None
-    last_updated: Optional[str] = None
+    category: str | None = None
+    last_updated: str | None = None
 
 
 class CascadeStepResponse(BaseModel):
@@ -89,8 +87,8 @@ class CascadePathResponse(BaseModel):
 class EvidenceResponse(BaseModel):
     source: str
     description: str
-    case_count: Optional[int]
-    url: Optional[str]
+    case_count: int | None
+    url: str | None
 
 
 class PGxAnnotation(BaseModel):
@@ -107,14 +105,14 @@ class InteractionResponse(BaseModel):
     severity: str
     risk_score: float
     description: str
-    mechanism: Optional[str]
+    mechanism: str | None
     cascade_paths: list[CascadePathResponse]
     evidence: list[EvidenceResponse]
     pgx_annotations: list[PGxAnnotation] = []
     explanation: str = ""
-    evidence_level: Optional[str] = None
-    source_citation: Optional[str] = None
-    clinical_significance: Optional[str] = None
+    evidence_level: str | None = None
+    source_citation: str | None = None
+    clinical_significance: str | None = None
 
 
 class CheckResponse(BaseModel):
@@ -140,7 +138,7 @@ class DataFreshnessResponse(BaseModel):
     drug_count: int
     interaction_count: int
     enzyme_count: int
-    last_updated: Optional[str]
+    last_updated: str | None
     data_version: str
 
 
@@ -158,7 +156,7 @@ class SearchResult(BaseModel):
     id: str
     name: str
     brand_names: list[str]
-    drug_class: Optional[str]
+    drug_class: str | None
 
 
 class LivenessResponse(BaseModel):
@@ -174,11 +172,11 @@ class HealthResponse(BaseModel):
 
 class PDFReportRequest(BaseModel):
     check_result: dict
-    graph_png_b64: Optional[str] = None
+    graph_png_b64: str | None = None
 
     @field_validator("graph_png_b64")
     @classmethod
-    def validate_png_size(cls, v: Optional[str]) -> Optional[str]:
+    def validate_png_size(cls, v: str | None) -> str | None:
         if v is not None and len(v) > _MAX_PNG_B64_LEN:
             raise ValueError(f"Graph image too large (max {_MAX_PNG_B64_LEN // (1024 * 1024)} MB)")
         return v
@@ -206,7 +204,7 @@ class PathwayEdge(BaseModel):
     source: str
     target: str
     relation: str
-    strength: Optional[str] = None
+    strength: str | None = None
 
 
 class PathwayResponse(BaseModel):
@@ -267,7 +265,7 @@ class ContraindicationResponse(BaseModel):
 class RegisterRequest(BaseModel):
     email: str
     password: str
-    display_name: Optional[str] = None
+    display_name: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -282,7 +280,7 @@ class RefreshRequest(BaseModel):
 class UserResponse(BaseModel):
     id: str
     email: str
-    display_name: Optional[str]
+    display_name: str | None
     created_at: str
 
 
@@ -296,14 +294,14 @@ class TokenResponse(BaseModel):
 class ProfileRequest(BaseModel):
     name: str
     drug_ids: list[str]
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class ProfileResponse(BaseModel):
     id: str
     name: str
     drug_ids: list[str]
-    notes: Optional[str]
+    notes: str | None
     created_at: str
     updated_at: str
 
@@ -318,14 +316,14 @@ class AnalysisHistoryResponse(BaseModel):
 class SharedResultResponse(BaseModel):
     id: str
     url: str
-    expires_at: Optional[str]
+    expires_at: str | None
 
 
 class AuditLogResponse(BaseModel):
     id: str
     action: str
-    resource_type: Optional[str]
-    resource_id: Optional[str]
+    resource_type: str | None
+    resource_id: str | None
     created_at: str
 
 

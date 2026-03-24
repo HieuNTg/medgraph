@@ -10,8 +10,6 @@ clinical decision support, medical advice, or professional judgment.
 Always defer to licensed healthcare professionals.
 """
 
-from __future__ import annotations
-
 import logging
 import uuid
 

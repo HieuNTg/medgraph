@@ -6,8 +6,6 @@ Uses stdlib only:
 - HMAC-SHA256 for JWT signing (no python-jose/passlib needed)
 """
 
-from __future__ import annotations
-
 import base64
 import hashlib
 import hmac

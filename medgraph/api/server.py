@@ -34,8 +34,6 @@ Endpoints:
     POST /api/v1/optimize                               — Optimize polypharmacy regimen
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os
@@ -45,7 +43,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -299,8 +297,8 @@ def create_app() -> FastAPI:
     _bearer = HTTPBearer(auto_error=False)
 
     def get_current_user(
-        credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
-    ) -> Optional[dict]:
+        credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    ) -> dict | None:
         """Extract and verify JWT from Authorization header. Returns user dict or None."""
         if credentials is None:
             return None
@@ -311,7 +309,7 @@ def create_app() -> FastAPI:
         return _user_auth.get_user(payload["sub"])
 
     def require_current_user(
-        user: Optional[dict] = Depends(get_current_user),
+        user: dict | None = Depends(get_current_user),
     ) -> dict:
         """Like get_current_user but raises 401 if not authenticated."""
         if user is None:
@@ -439,7 +437,7 @@ def create_app() -> FastAPI:
     async def check(
         request: CheckRequest,
         http_request: Request,
-        current_user: Optional[dict] = Depends(get_current_user),
+        current_user: dict | None = Depends(get_current_user),
     ) -> CheckResponse:
         """
         Analyze drug-drug interactions for a set of drugs.
@@ -1111,7 +1109,7 @@ def create_app() -> FastAPI:
         analysis_id: str = Query(..., description="ID of analysis_history entry to share"),
         expires_days: int = Query(7, ge=1, le=30),
         request: Request = None,
-        user: Optional[dict] = Depends(get_current_user),
+        user: dict | None = Depends(get_current_user),
     ) -> SharedResultResponse:
         store: GraphStore = app.state.store
         row = store.get_analysis_by_id(analysis_id)
@@ -1234,8 +1232,8 @@ def create_app() -> FastAPI:
         "/audit", response_model=list[AuditLogResponse], tags=["system"], dependencies=_api_deps
     )
     async def get_audit_log(
-        user_id: Optional[str] = Query(None),
-        action: Optional[str] = Query(None),
+        user_id: str | None = Query(None),
+        action: str | None = Query(None),
         limit: int = Query(50, ge=1, le=200),
         offset: int = Query(0, ge=0),
         _user: dict = Depends(require_current_user),

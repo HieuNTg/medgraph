@@ -129,7 +129,7 @@ class TestAlembicMigrations:
         upgrade(db_path=temp_db)
 
         rev = current(db_path=temp_db)
-        assert rev == "001"
+        assert rev == "003"
 
     def test_downgrade_removes_tables(self, temp_db, monkeypatch):
         """Alembic downgrade to base removes all tables."""
@@ -149,13 +149,13 @@ class TestAlembicMigrations:
         monkeypatch.setenv("MEDGRAPH_DB_PATH", str(temp_db))
 
         upgrade(db_path=temp_db)
-        assert current(db_path=temp_db) == "001"
+        assert current(db_path=temp_db) == "003"
 
         downgrade(db_path=temp_db, revision="base")
         assert current(db_path=temp_db) is None
 
         upgrade(db_path=temp_db)
-        assert current(db_path=temp_db) == "001"
+        assert current(db_path=temp_db) == "003"
 
     def test_stamp_without_running(self, temp_db, monkeypatch):
         """Stamp marks revision without running migration SQL."""
@@ -181,7 +181,7 @@ class TestAlembicMigrations:
         ).fetchone()
         conn.close()
         assert row is not None
-        assert row["value"] == "001"
+        assert row["value"] == "003"
 
 
 # ---------------------------------------------------------------------------

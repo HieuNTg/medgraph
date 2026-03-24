@@ -5,8 +5,6 @@ Describes the server's FHIR capabilities per the FHIR R4 spec:
 https://hl7.org/fhir/R4/capabilitystatement.html
 """
 
-from __future__ import annotations
-
 from medgraph import __version__
 
 

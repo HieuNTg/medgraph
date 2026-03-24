@@ -6,10 +6,7 @@ MEDGRAPH internal drug IDs. Supports MedicationRequest,
 MedicationStatement, and Bundle resources.
 """
 
-from __future__ import annotations
-
 import logging
-from typing import Optional
 
 from medgraph.graph.store import GraphStore
 
@@ -68,7 +65,7 @@ class FHIRParser:
                     results.append(drug_id)
         return results
 
-    def _resolve_medication(self, medication: dict) -> Optional[str]:
+    def _resolve_medication(self, medication: dict) -> str | None:
         """
         Resolve a single FHIR medication resource to a MEDGRAPH drug ID.
 
