@@ -7,9 +7,9 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Dna, AlertTriangle, ChevronRight, Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Dna, AlertTriangle, Info } from "lucide-react";
 import { CYP_GENES, PHENOTYPES } from "@/components/metabolizer-selector";
+import { DrugInput } from "@/components/drug-input";
 import { checkInteractions } from "@/lib/api";
 import type { CheckResponse } from "@/lib/types";
 
@@ -60,7 +60,6 @@ function PhenotypeDropdown({
 export function PharmacogenomicsPage() {
   const navigate = useNavigate();
   const [genotype, setGenotype] = useState<Record<string, string>>({});
-  const [drugs, setDrugs] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,20 +75,8 @@ export function PharmacogenomicsPage() {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleDrugSubmit = async (drugList: string[]) => {
     setError(null);
-
-    const drugList = drugs
-      .split(/[,\n]+/)
-      .map((d) => d.trim())
-      .filter(Boolean);
-
-    if (drugList.length < 2) {
-      setError("Enter at least 2 drug names separated by commas.");
-      return;
-    }
-
     setLoading(true);
     try {
       const result: CheckResponse = await checkInteractions(
@@ -130,7 +117,7 @@ export function PharmacogenomicsPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         {/* Genotype Input */}
         <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
           <div className="border-b border-[var(--border)] px-5 py-3">
@@ -211,18 +198,11 @@ export function PharmacogenomicsPage() {
               Medications to Check
             </h2>
             <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-              Enter drug names separated by commas or new lines (2–10 drugs).
+              Search and add 2–10 drugs to check with your genotype profile.
             </p>
           </div>
           <div className="px-5 py-4">
-            <textarea
-              value={drugs}
-              onChange={(e) => setDrugs(e.target.value)}
-              placeholder="e.g. Warfarin, Clopidogrel, Omeprazole"
-              rows={4}
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-none"
-              aria-label="Drug names"
-            />
+            <DrugInput onSubmit={handleDrugSubmit} loading={loading} />
           </div>
         </div>
 
@@ -243,25 +223,7 @@ export function PharmacogenomicsPage() {
             {error}
           </div>
         )}
-
-        <Button
-          type="submit"
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-2"
-        >
-          {loading ? (
-            <>
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              Analyzing with genotype…
-            </>
-          ) : (
-            <>
-              Check Interactions with Genotype
-              <ChevronRight className="h-4 w-4" />
-            </>
-          )}
-        </Button>
-      </form>
+      </div>
 
       {/* Disclaimer */}
       <p className="text-xs text-center text-[var(--muted-foreground)]">

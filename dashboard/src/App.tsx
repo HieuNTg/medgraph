@@ -6,6 +6,7 @@ import { AppShell } from "@/layout/app-shell";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { AnalysisSkeleton } from "@/components/loading-skeleton";
 import { AuthProvider } from "@/lib/auth-context";
+import { ProtectedRoute } from "@/components/protected-route";
 import { HomePage } from "@/pages/home";
 import { CheckerPage } from "@/pages/checker";
 import { DrugInfoPage } from "@/pages/drug-info";
@@ -90,17 +91,21 @@ function App() {
                 <Route
                   path="/profiles"
                   element={
-                    <Suspense fallback={<AnalysisSkeleton />}>
-                      <ProfilesPage />
-                    </Suspense>
+                    <ProtectedRoute>
+                      <Suspense fallback={<AnalysisSkeleton />}>
+                        <ProfilesPage />
+                      </Suspense>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/history"
                   element={
-                    <Suspense fallback={<AnalysisSkeleton />}>
-                      <HistoryPage />
-                    </Suspense>
+                    <ProtectedRoute>
+                      <Suspense fallback={<AnalysisSkeleton />}>
+                        <HistoryPage />
+                      </Suspense>
+                    </ProtectedRoute>
                   }
                 />
                 <Route

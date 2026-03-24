@@ -113,6 +113,17 @@ class DataSeeder:
             self._seed_extended_interactions()
             progress.update(task, description="Extended interactions seeded", completed=1, total=1)
 
+            # Step 2c: DrugBank-expansion seed data (200+ additional drugs)
+            task = progress.add_task("Seeding DrugBank-expansion drugs...", total=None)
+            self._seed_drugbank_expansion_drugs()
+            progress.update(task, description="DrugBank-expansion drugs seeded", completed=1, total=1)
+
+            task = progress.add_task("Seeding DrugBank-expansion interactions...", total=None)
+            self._seed_drugbank_expansion_interactions()
+            progress.update(
+                task, description="DrugBank-expansion interactions seeded", completed=1, total=1
+            )
+
             task = progress.add_task("Seeding pharmacogenomics guidelines...", total=None)
             self._seed_pharmacogenomics()
             progress.update(
@@ -319,6 +330,28 @@ class DataSeeder:
             )
         except ImportError:
             logger.debug("seed_interactions_extended not available — skipping")
+
+    def _seed_drugbank_expansion_drugs(self) -> None:
+        try:
+            from medgraph.data.seed_drugs_drugbank import DRUGS_DRUGBANK
+
+            self._batch_upsert_drugs([Drug(**d) for d in DRUGS_DRUGBANK])
+        except ImportError:
+            logger.debug("seed_drugs_drugbank not available — skipping")
+
+    def _seed_drugbank_expansion_interactions(self) -> None:
+        try:
+            from medgraph.data.seed_interactions_drugbank import (
+                INTERACTIONS_DRUGBANK,
+                DRUG_ENZYME_RELATIONS_DRUGBANK,
+            )
+
+            self._batch_upsert_interactions([Interaction(**i) for i in INTERACTIONS_DRUGBANK])
+            self._batch_upsert_enzyme_relations(
+                [DrugEnzymeRelation(**r) for r in DRUG_ENZYME_RELATIONS_DRUGBANK]
+            )
+        except ImportError:
+            logger.debug("seed_interactions_drugbank not available — skipping")
 
     def _seed_pharmacogenomics(self) -> None:
         try:

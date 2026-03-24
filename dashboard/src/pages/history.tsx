@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { History, AlertCircle, Loader2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HistoryTimeline } from "@/components/history-timeline";
@@ -13,33 +14,36 @@ export function HistoryPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
-  const [entries, setEntries] = useState<AnalysisHistoryEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Extra pages loaded beyond the initial useQuery fetch
+  const [extraEntries, setExtraEntries] = useState<AnalysisHistoryEntry[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [replaying, setReplaying] = useState(false);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    setLoading(true);
-    getHistory(PAGE_SIZE, 0)
-      .then((data) => {
-        setEntries(data);
-        setHasMore(data.length === PAGE_SIZE);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load history."))
-      .finally(() => setLoading(false));
-  }, [isAuthenticated]);
+  const {
+    data: initialEntries = [],
+    isLoading: loading,
+    error: queryError,
+  } = useQuery<AnalysisHistoryEntry[]>({
+    queryKey: ["history"],
+    queryFn: () => getHistory(PAGE_SIZE, 0),
+    enabled: isAuthenticated,
+  });
+
+  const entries = [...initialEntries, ...extraEntries];
+  const error = queryError
+    ? queryError instanceof Error ? queryError.message : "Failed to load history."
+    : loadMoreError;
+  const hasMore = entries.length > 0 && entries.length % PAGE_SIZE === 0;
 
   const loadMore = async () => {
     setLoadingMore(true);
+    setLoadMoreError(null);
     try {
       const data = await getHistory(PAGE_SIZE, entries.length);
-      setEntries((prev) => [...prev, ...data]);
-      setHasMore(data.length === PAGE_SIZE);
+      setExtraEntries((prev) => [...prev, ...data]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load more.");
+      setLoadMoreError(err instanceof Error ? err.message : "Failed to load more.");
     } finally {
       setLoadingMore(false);
     }
@@ -51,7 +55,7 @@ export function HistoryPage() {
       const result = await checkInteractions(entry.drug_ids);
       navigate("/results", { state: { result } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to replay analysis.");
+      setLoadMoreError(err instanceof Error ? err.message : "Failed to replay analysis.");
       setReplaying(false);
     }
   };

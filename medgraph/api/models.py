@@ -417,5 +417,130 @@ class ScheduleResponse(BaseModel):
     disclaimer: str
 
 
+# ── PGx Check Models (POST /api/v1/check-pgx) ────────────────────────────────
+
+_VALID_FULL_PHENOTYPES = {
+    "poor_metabolizer",
+    "intermediate_metabolizer",
+    "normal_metabolizer",
+    "rapid_metabolizer",
+    "ultrarapid_metabolizer",
+}
+
+_VALID_ANCESTRY = {
+    "european",
+    "east_asian",
+    "african",
+    "south_asian",
+    "hispanic",
+    "middle_eastern",
+}
+
+
+class PGxCheckRequest(BaseModel):
+    """Request body for POST /api/v1/check-pgx."""
+
+    drugs: list[str] = Field(..., min_length=2, max_length=10)
+    phenotypes: dict[str, str] = Field(
+        default_factory=dict,
+        description="Gene ID → phenotype string, e.g. {'CYP2D6': 'poor_metabolizer'}",
+    )
+    ancestry: str | None = Field(
+        None,
+        description="Self-reported ancestry for population frequency context",
+    )
+
+    @field_validator("drugs")
+    @classmethod
+    def validate_pgx_drugs(cls, v: list[str]) -> list[str]:
+        sanitized = []
+        for name in v:
+            stripped = name.strip()
+            if not stripped:
+                continue
+            if len(stripped) > 100:
+                raise ValueError(f"Drug name too long (max 100 chars): '{stripped[:20]}...'")
+            if not _DRUG_NAME_PATTERN.match(stripped):
+                raise ValueError(f"Drug name contains invalid characters: '{stripped}'")
+            sanitized.append(stripped)
+        if len(sanitized) < 2:
+            raise ValueError("At least 2 valid drug names are required")
+        if len(sanitized) > _MAX_DRUGS:
+            raise ValueError(f"Too many drugs (max {_MAX_DRUGS})")
+        return sanitized
+
+    @field_validator("phenotypes")
+    @classmethod
+    def validate_full_phenotypes(cls, v: dict[str, str]) -> dict[str, str]:
+        for gene, phenotype in v.items():
+            if phenotype.lower() not in _VALID_FULL_PHENOTYPES:
+                raise ValueError(
+                    f"Invalid phenotype '{phenotype}' for {gene}. "
+                    f"Must be one of: {', '.join(sorted(_VALID_FULL_PHENOTYPES))}"
+                )
+        return v
+
+    @field_validator("ancestry")
+    @classmethod
+    def validate_ancestry(cls, v: str | None) -> str | None:
+        if v is not None and v.lower() not in _VALID_ANCESTRY:
+            raise ValueError(
+                f"Invalid ancestry '{v}'. "
+                f"Must be one of: {', '.join(sorted(_VALID_ANCESTRY))}"
+            )
+        return v
+
+
+class PGxAdjustment(BaseModel):
+    """A single pharmacogenomics adjustment applied to an interaction."""
+
+    drug_name: str
+    gene: str
+    phenotype: str
+    severity_multiplier: float
+    reason: str
+
+
+class PGxInteractionResponse(BaseModel):
+    """Interaction response enriched with PGx adjustments."""
+
+    drug_a: DrugResponse
+    drug_b: DrugResponse
+    base_severity: str
+    base_risk_score: float
+    adjusted_severity: str
+    adjusted_risk_score: float
+    description: str
+    mechanism: str | None = None
+    pgx_adjustments: list[PGxAdjustment] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    pgx_confidence: float = 0.0
+    cascade_paths: list[CascadePathResponse] = Field(default_factory=list)
+    evidence: list[EvidenceResponse] = Field(default_factory=list)
+
+
+class PGxSummary(BaseModel):
+    """Summary of PGx findings across the full regimen."""
+
+    genes_tested: list[str]
+    actionable_findings: int
+    confidence: float
+
+
+class PGxCheckResponse(BaseModel):
+    """Response for POST /api/v1/check-pgx."""
+
+    drugs: list[DrugResponse]
+    interactions: list[PGxInteractionResponse]
+    overall_risk: str
+    overall_score: float
+    drug_count: int
+    interaction_count: int
+    pgx_summary: PGxSummary
+    timestamp: str
+    disclaimer: str
+    food_interactions: list[FoodInteractionResponse] = Field(default_factory=list)
+
+
 # ── Evidence Confidence Fields (added to InteractionResponse) ─────────────────
 # These fields are appended to InteractionResponse via model extension pattern.

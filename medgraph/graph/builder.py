@@ -65,7 +65,9 @@ class GraphBuilder:
                 )
 
         # Add food item nodes + food->enzyme edges
-        food_interactions = store.get_food_interactions([drug.id for drug in store.get_all_drugs()])
+        # Reuse drug IDs already in graph to avoid duplicate get_all_drugs() call
+        drug_ids = [data["drug_id"] for _, data in g.nodes(data=True) if data.get("node_type") == "drug"]
+        food_interactions = store.get_food_interactions(drug_ids)
         seen_foods: dict[str, dict] = {}
         for fi in food_interactions:
             food_node = f"food:{fi['food_name']}"

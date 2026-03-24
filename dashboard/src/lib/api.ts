@@ -14,6 +14,7 @@ import type {
   TokenResponse,
   User,
 } from "./types";
+import { setOfflineAuthToken } from "./offline-store";
 
 const API_BASE = "";
 
@@ -22,6 +23,7 @@ let authToken: string | null = null;
 
 export function setAuthToken(token: string | null) {
   authToken = token;
+  setOfflineAuthToken(token);
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -213,9 +215,11 @@ export async function exportPdfReport(
   checkResult: CheckResponse,
   graphPngB64?: string
 ): Promise<Blob> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
   const res = await fetch("/api/report/pdf", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       check_result: checkResult,
       graph_png_b64: graphPngB64 ?? null,

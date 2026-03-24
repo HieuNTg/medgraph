@@ -185,6 +185,17 @@ export function ResultsPage() {
     return () => observer.disconnect();
   }, []);
 
+  // All hooks must be called before any conditional return (Rules of Hooks)
+  const sorted = useMemo(
+    () => state?.result ? sortBySeverity(state.result.interactions) : [],
+    [state?.result?.interactions]
+  );
+
+  const polypharmacyData = useMemo(
+    () => state?.result ? derivePolypharmacyData(state.result) : null,
+    [state?.result]
+  );
+
   if (!state?.result) return null;
 
   const { result, metabolizerPhenotypes, pgxAlerts, ancestry } = state;
@@ -213,15 +224,9 @@ export function ResultsPage() {
     }
   };
 
-  const sorted = useMemo(
-    () => sortBySeverity(result.interactions),
-    [result.interactions]
-  );
   const hasGraphData =
     result.drugs.some((d) => d.enzyme_relations.length > 0) ||
     result.interactions.some((i) => i.cascade_paths.length > 0);
-
-  const polypharmacyData = derivePolypharmacyData(result);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">

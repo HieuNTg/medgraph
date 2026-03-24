@@ -437,18 +437,39 @@ def import_drugbank(csv_path: str, db: str, batch_size: int) -> None:
     default=False,
     help="Force refresh even if data is fresh",
 )
-def refresh(db: str, schedule: str | None, sources: str | None, force: bool) -> None:
+@click.option(
+    "--history",
+    is_flag=True,
+    default=False,
+    help="Show recent refresh history instead of running a refresh",
+)
+@click.option(
+    "--limit",
+    default=20,
+    help="Number of history entries to show (used with --history)",
+    show_default=True,
+)
+def refresh(
+    db: str,
+    schedule: str | None,
+    sources: str | None,
+    force: bool,
+    history: bool,
+    limit: int,
+) -> None:
     """
-    Run data refresh from external sources.
+    Run data refresh from external sources, or view refresh history.
 
-    With --schedule weekly, skips refresh if data is less than 7 days old.
-    With --schedule daily, skips refresh if data is less than 1 day old.
-
-    Example:
-        python -m medgraph.cli refresh --schedule weekly
+    Examples:
+        python -m medgraph.cli refresh
         python -m medgraph.cli refresh --sources openfda --force
+        python -m medgraph.cli refresh --history
+        python -m medgraph.cli refresh --schedule weekly
     """
+    import asyncio
+
     from medgraph.data.refresh_pipeline import DataRefreshPipeline
+    from medgraph.data.refresh_service import RefreshService
     from medgraph.graph.store import GraphStore
 
     db_path = Path(db)
@@ -460,11 +481,36 @@ def refresh(db: str, schedule: str | None, sources: str | None, force: bool) -> 
         sys.exit(1)
 
     store = GraphStore(db_path)
-    pipeline = DataRefreshPipeline(store)
 
+    # -- History mode -------------------------------------------------------
+    if history:
+        svc = RefreshService(store)
+        rows = store.get_refresh_history(limit=limit)
+        if not rows:
+            console.print("[dim]No refresh history found.[/]")
+            return
+        console.print(
+            Panel(
+                f"[bold blue]MEDGRAPH[/] Refresh History (last {len(rows)} entries)",
+                expand=False,
+            )
+        )
+        for row in rows:
+            status_color = "green" if row["status"] == "completed" else "red"
+            console.print(
+                f"  [{status_color}]{row['status'].upper()}[/]  "
+                f"source={row['source']}  "
+                f"records={row['records_updated']}  "
+                f"at={row['created_at']}"
+            )
+        return
+
+    # -- Incremental refresh (via RefreshService) ---------------------------
     source_list = [s.strip() for s in sources.split(",")] if sources else None
 
     if schedule:
+        # Use legacy pipeline for scheduled / freshness-aware refresh
+        pipeline = DataRefreshPipeline(store)
         console.print(f"[bold blue]MEDGRAPH[/] Scheduled refresh — [cyan]{schedule}[/]")
         result = pipeline.schedule_refresh(sources=source_list, schedule=schedule, force=force)
         if result is None:
@@ -474,20 +520,37 @@ def refresh(db: str, schedule: str | None, sources: str | None, force: bool) -> 
                 f"Last updated: {freshness.get('last_updated', 'unknown')}[/]"
             )
             return
-    else:
-        console.print("[bold blue]MEDGRAPH[/] Running data refresh…")
-        result = pipeline.refresh(sources=source_list)
+        status_color = "green" if result.success else "red"
+        console.print(
+            f"\n[bold {status_color}]Refresh {'complete' if result.success else 'failed'}![/]\n"
+            f"  Sources attempted: {', '.join(result.sources_attempted)}\n"
+            f"  Succeeded: {', '.join(result.sources_succeeded) or 'none'}\n"
+            f"  Failed: {', '.join(result.sources_failed) or 'none'}\n"
+            f"  Records updated: [cyan]{result.records_updated}[/]"
+        )
+        if result.errors:
+            for src, err in result.errors.items():
+                console.print(f"  [red]  {src}: {err}[/]")
+        return
 
-    status_color = "green" if result.success else "red"
+    # Default: incremental refresh via RefreshService
+    console.print("[bold blue]MEDGRAPH[/] Running incremental FAERS refresh…")
+    svc = RefreshService(store)
+
+    with console.status("Querying OpenFDA FAERS…"):
+        job = asyncio.run(svc.trigger_refresh(sources=source_list, force=force))
+
+    status_color = "green" if job.status == "completed" else "red"
     console.print(
-        f"\n[bold {status_color}]Refresh {'complete' if result.success else 'failed'}![/]\n"
-        f"  Sources attempted: {', '.join(result.sources_attempted)}\n"
-        f"  Succeeded: {', '.join(result.sources_succeeded) or 'none'}\n"
-        f"  Failed: {', '.join(result.sources_failed) or 'none'}\n"
-        f"  Records updated: [cyan]{result.records_updated}[/]"
+        f"\n[bold {status_color}]Refresh {job.status}![/]\n"
+        f"  Job ID: [dim]{job.job_id}[/]\n"
+        f"  Sources attempted: {', '.join(job.sources_attempted)}\n"
+        f"  Succeeded: {', '.join(job.sources_succeeded) or 'none'}\n"
+        f"  Failed: {', '.join(job.sources_failed) or 'none'}\n"
+        f"  Records updated: [cyan]{job.records_updated}[/]"
     )
-    if result.errors:
-        for src, err in result.errors.items():
+    if job.errors:
+        for src, err in job.errors.items():
             console.print(f"  [red]  {src}: {err}[/]")
 
 

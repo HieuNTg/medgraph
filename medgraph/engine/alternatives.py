@@ -39,11 +39,31 @@ class AlternativesFinder:
     2. Identify which enzymes the regimen drugs (excluding target) use.
     3. Find same drug_class candidates from the store.
     4. Rank candidates by fewest shared enzymes with regimen.
+
+    Caches drug and enzyme relation data to avoid full table scans per request.
     """
 
     def __init__(self, graph: nx.DiGraph, store: GraphStore) -> None:
         self.graph = graph
         self.store = store
+        # Lazy-loaded caches (populated on first use)
+        self._all_drugs_cache: list | None = None
+        self._enzyme_index_cache: dict[str, set[str]] | None = None
+
+    def _get_enzyme_index(self) -> dict[str, set[str]]:
+        """Build and cache enzyme index: drug_id -> set of enzyme_ids."""
+        if self._enzyme_index_cache is None:
+            all_relations = self.store.get_all_drug_enzyme_relations()
+            self._enzyme_index_cache = {}
+            for rel in all_relations:
+                self._enzyme_index_cache.setdefault(rel.drug_id, set()).add(rel.enzyme_id)
+        return self._enzyme_index_cache
+
+    def _get_all_drugs(self) -> list:
+        """Get and cache all drugs."""
+        if self._all_drugs_cache is None:
+            self._all_drugs_cache = self.store.get_all_drugs()
+        return self._all_drugs_cache
 
     def find_alternatives(self, drug_id: str, regimen: list[str]) -> list[Alternative]:
         """
@@ -68,12 +88,8 @@ class AlternativesFinder:
             logger.info(f"AlternativesFinder: no drug_class for {drug_id}")
             return []
 
-        # Build enzyme index from store (one query)
-        all_relations = self.store.get_all_drug_enzyme_relations()
-        # drug_id -> set of enzyme_ids used
-        enzyme_index: dict[str, set[str]] = {}
-        for rel in all_relations:
-            enzyme_index.setdefault(rel.drug_id, set()).add(rel.enzyme_id)
+        # Build enzyme index from cached data
+        enzyme_index = self._get_enzyme_index()
 
         # Collect enzymes used by regimen (excluding the target drug)
         regimen_enzymes: set[str] = set()
@@ -81,9 +97,9 @@ class AlternativesFinder:
             if rid != drug_id:
                 regimen_enzymes.update(enzyme_index.get(rid, set()))
 
-        # Get all drugs and filter to same class, excluding target + regimen members
+        # Get all drugs from cache, filter to same class, excluding target + regimen members
         regimen_set = set(regimen)
-        all_drugs = self.store.get_all_drugs()
+        all_drugs = self._get_all_drugs()
 
         alternatives: list[Alternative] = []
         for candidate in all_drugs:

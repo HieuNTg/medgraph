@@ -183,10 +183,17 @@ class PubMedAgent:
             return []
 
     def _parse_pubmed_xml(self, xml_text: str) -> list[PubMedArticle]:
-        """Parse PubMed efetch XML into PubMedArticle objects."""
+        """Parse PubMed efetch XML into PubMedArticle objects.
+
+        Uses defusedxml when available to prevent XML entity attacks.
+        """
         articles: list[PubMedArticle] = []
         try:
-            root = ET.fromstring(xml_text)
+            try:
+                import defusedxml.ElementTree as SafeET
+                root = SafeET.fromstring(xml_text)
+            except ImportError:
+                root = ET.fromstring(xml_text)
         except ET.ParseError as exc:
             logger.warning("Failed to parse PubMed XML: %s", exc)
             return []

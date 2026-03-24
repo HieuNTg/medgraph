@@ -1,6 +1,18 @@
 // IndexedDB wrapper for offline drug data caching.
 // Stores drug records, interactions, and sync metadata for offline use.
 
+// Injected by api.ts to keep auth headers consistent
+let _offlineAuthToken: string | null = null;
+export function setOfflineAuthToken(token: string | null) {
+  _offlineAuthToken = token;
+}
+
+function offlineFetch(url: string): Promise<Response> {
+  const headers: Record<string, string> = {};
+  if (_offlineAuthToken) headers["Authorization"] = `Bearer ${_offlineAuthToken}`;
+  return fetch(url, { headers });
+}
+
 const DB_NAME = "medgraph-offline";
 const DB_VERSION = 1;
 
@@ -60,8 +72,8 @@ export class OfflineStore {
     if (!this.db) await this.init();
 
     const [drugsRes, statsRes] = await Promise.all([
-      fetch("/api/drugs/search?q=&limit=500"),
-      fetch("/api/stats"),
+      offlineFetch("/api/drugs/search?q=&limit=500"),
+      offlineFetch("/api/stats"),
     ]);
 
     if (!drugsRes.ok) throw new Error(`Sync failed: drugs ${drugsRes.status}`);

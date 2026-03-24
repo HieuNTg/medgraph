@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import type { HubDrugResponse } from "@/lib/types";
+import { getHubDrugs, getStats } from "@/lib/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -30,20 +31,6 @@ interface NetworkEdge {
   source: string;
   target: string;
   type: string;
-}
-
-// ── API ───────────────────────────────────────────────────────────────────────
-
-async function fetchHubDrugs(): Promise<HubDrugResponse[]> {
-  const res = await fetch("/api/v1/graph/hub-drugs");
-  if (!res.ok) throw new Error("Failed to fetch hub drugs");
-  return res.json();
-}
-
-async function fetchStats(): Promise<{ drug_count: number; interaction_count: number; enzyme_count: number }> {
-  const res = await fetch("/api/v1/stats");
-  if (!res.ok) throw new Error("Failed to fetch stats");
-  return res.json();
 }
 
 // ── Force Layout Hook ─────────────────────────────────────────────────────────
@@ -175,13 +162,13 @@ const SVG_H = 540;
 export function NetworkPage() {
   const { data: hubDrugs, isLoading, error } = useQuery<HubDrugResponse[]>({
     queryKey: ["hub-drugs-network"],
-    queryFn: fetchHubDrugs,
+    queryFn: () => getHubDrugs(),
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: stats } = useQuery({
     queryKey: ["stats-network"],
-    queryFn: fetchStats,
+    queryFn: () => getStats(),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -198,14 +185,21 @@ export function NetworkPage() {
     const cy = SVG_H / 2;
     const r = 160;
 
+    // Deterministic hash-based offset to avoid Math.random() in useMemo
+    const hashOffset = (s: string, seed: number) => {
+      let h = seed;
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0x7fffffff;
+      return ((h % 100) - 50) / 50; // returns -1 to 1
+    };
+
     const drugNodes: NetworkNode[] = hubDrugs.map((h, i) => {
       const angle = (2 * Math.PI * i) / hubDrugs.length;
       return {
         id: h.drug_id,
         label: h.drug_name,
         type: "drug",
-        x: cx + Math.cos(angle) * r + (Math.random() - 0.5) * 40,
-        y: cy + Math.sin(angle) * r + (Math.random() - 0.5) * 40,
+        x: cx + Math.cos(angle) * r + hashOffset(h.drug_id, 1) * 40,
+        y: cy + Math.sin(angle) * r + hashOffset(h.drug_id, 2) * 40,
         vx: 0,
         vy: 0,
         connections: h.interaction_count,
@@ -219,19 +213,19 @@ export function NetworkPage() {
         id: `enzyme_${name}`,
         label: name,
         type: "enzyme",
-        x: cx + Math.cos(angle) * 70 + (Math.random() - 0.5) * 30,
-        y: cy + Math.sin(angle) * 70 + (Math.random() - 0.5) * 30,
+        x: cx + Math.cos(angle) * 70 + hashOffset(name, 3) * 30,
+        y: cy + Math.sin(angle) * 70 + hashOffset(name, 4) * 30,
         vx: 0,
         vy: 0,
         connections: 0,
       };
     });
 
-    // Connect hub drugs to enzymes (synthetic but representative)
+    // Connect hub drugs to enzymes (deterministic based on drug ID)
     const edgeList: NetworkEdge[] = [];
     for (const drug of drugNodes) {
-      const enzymeCount = drug.isHub ? 3 : 1 + Math.floor(Math.random() * 2);
-      const shuffled = [...enzymeNodes].sort(() => Math.random() - 0.5);
+      const enzymeCount = drug.isHub ? 3 : 1 + (Math.abs(hashOffset(drug.id, 5) * 50) | 0) % 2;
+      const shuffled = [...enzymeNodes].sort((a, b) => hashOffset(a.id + drug.id, 6) - hashOffset(b.id + drug.id, 6));
       for (let k = 0; k < enzymeCount && k < shuffled.length; k++) {
         edgeList.push({ source: drug.id, target: shuffled[k].id, type: "metabolized_by" });
       }
@@ -349,7 +343,7 @@ export function NetworkPage() {
         </div>
       )}
 
-      <div className="flex gap-4 items-start">
+      <div className="flex flex-col md:flex-row gap-4 md:items-start">
         {/* Graph area */}
         <div className="flex-1 min-w-0">
           <Card className="overflow-hidden">
@@ -504,7 +498,7 @@ export function NetworkPage() {
         </div>
 
         {/* Sidebar */}
-        <aside className="w-64 shrink-0 space-y-4">
+        <aside className="w-full md:w-64 md:shrink-0 space-y-4">
           {selectedNode ? (
             <Card>
               <CardHeader className="pb-2">
