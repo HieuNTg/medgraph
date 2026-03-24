@@ -115,6 +115,16 @@ class InteractionResponse(BaseModel):
     clinical_significance: str | None = None
 
 
+class FoodInteractionResponse(BaseModel):
+    food_name: str
+    food_category: str
+    drug_id: str
+    severity: str
+    description: str
+    mechanism: str | None = None
+    evidence_level: str = "C"
+
+
 class CheckResponse(BaseModel):
     drugs: list[DrugResponse]
     interactions: list[InteractionResponse]
@@ -125,6 +135,7 @@ class CheckResponse(BaseModel):
     timestamp: str
     disclaimer: str
     summary: str = ""
+    food_interactions: list[FoodInteractionResponse] = []
 
 
 class StatsResponse(BaseModel):

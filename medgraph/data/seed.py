@@ -118,6 +118,10 @@ class DataSeeder:
                 task, description="Pharmacogenomics guidelines seeded", completed=1, total=1
             )
 
+            task = progress.add_task("Seeding food interactions...", total=None)
+            self._seed_food_interactions()
+            progress.update(task, description="Food interactions seeded", completed=1, total=1)
+
             # Step 3: DrugBank data (if available)
             parser = DrugBankParser(self.drugbank_dir)
             if parser.is_available():
@@ -232,6 +236,42 @@ class DataSeeder:
                 self.store.upsert_genetic_guideline(GeneticGuideline(**g))
         except ImportError:
             logger.debug("seed_pharmacogenomics not available — skipping")
+
+    def _seed_food_interactions(self) -> None:
+        try:
+            from medgraph.data.seed_food_interactions import FOOD_ITEMS, FOOD_DRUG_INTERACTIONS
+
+            # Build drug name -> id lookup
+            all_drugs = self.store.get_all_drugs()
+            drug_name_to_id = {d.name.lower(): d.id for d in all_drugs}
+
+            # Build food id -> food metadata lookup
+            food_meta = {f["id"]: f for f in FOOD_ITEMS}
+
+            rows = []
+            for pair in FOOD_DRUG_INTERACTIONS:
+                drug_id = drug_name_to_id.get(pair["drug_name"].lower())
+                if not drug_id:
+                    logger.debug(f"Food interaction: drug '{pair['drug_name']}' not found in DB — skipping")
+                    continue
+                food = food_meta[pair["food_id"]]
+                row_id = f"{pair['food_id']}_{drug_id}"
+                rows.append(
+                    {
+                        "id": row_id,
+                        "food_name": food["name"],
+                        "food_category": food["category"],
+                        "drug_id": drug_id,
+                        "severity": pair["severity"],
+                        "description": pair["description"],
+                        "mechanism": food["mechanism"],
+                        "evidence_level": pair.get("evidence_level", "C"),
+                    }
+                )
+
+            self.store.seed_food_interactions(rows)
+        except ImportError:
+            logger.debug("seed_food_interactions not available — skipping")
 
     def _seed_drugbank(self, parser: DrugBankParser, progress, task) -> None:
         """Seed from DrugBank CSV files."""

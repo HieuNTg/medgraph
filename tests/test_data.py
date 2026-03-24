@@ -136,6 +136,8 @@ class TestGraphStoreCRUD:
         assert relations[0].strength == "strong"
 
     def test_upsert_adverse_event(self, tmp_store: GraphStore) -> None:
+        tmp_store.upsert_drug(Drug(id="DB00001", name="DrugA"))
+        tmp_store.upsert_drug(Drug(id="DB00002", name="DrugB"))
         event = AdverseEvent(
             id="AE-001",
             drug_ids=["DB00001", "DB00002"],

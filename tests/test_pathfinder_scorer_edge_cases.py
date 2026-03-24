@@ -206,3 +206,92 @@ class TestRiskScorerEdgeCases:
         assert self.rs._compute_cascade_bonus(
             [_cascade("major", [_step("inhibits", "strong")])]
         ) == pytest.approx(35.0)
+
+
+# --------------- PathFinder multi-drug / timeout / dedup tests ---------------
+
+
+def _six_drug_graph():
+    """
+    6 drugs sharing CYP3A4:
+      Drug1..Drug3 inhibit CYP3A4 (strong)
+      Drug4..Drug6 are metabolized by CYP3A4
+    Guarantees depth-3 paths (drug -> enzyme -> drug) are reachable.
+    """
+    g = nx.DiGraph()
+    inhibitors = ["D1", "D2", "D3"]
+    substrates = ["D4", "D5", "D6"]
+    for d in inhibitors + substrates:
+        g.add_node(f"drug:{d}", node_type="drug", name=f"Drug{d}")
+    g.add_node("enzyme:CYP3A4", node_type="enzyme", name="CYP3A4", enzyme_id="CYP3A4")
+    for d in inhibitors:
+        g.add_edge(f"drug:{d}", "enzyme:CYP3A4", relation="inhibits", strength="strong")
+    for d in substrates:
+        g.add_edge(f"drug:{d}", "enzyme:CYP3A4", relation="metabolized_by", strength="moderate")
+    return g, inhibitors + substrates
+
+
+def _ten_drug_graph():
+    """
+    10 drugs: 5 inhibitors + 5 substrates across CYP3A4 and CYP2D6.
+    Enough combinations to stress the BFS timeout path.
+    """
+    g = nx.DiGraph()
+    inhibitors = [f"I{i}" for i in range(5)]
+    substrates = [f"S{i}" for i in range(5)]
+    all_ids = inhibitors + substrates
+    for d in all_ids:
+        g.add_node(f"drug:{d}", node_type="drug", name=f"Drug{d}")
+    for enz in ["CYP3A4", "CYP2D6"]:
+        g.add_node(f"enzyme:{enz}", node_type="enzyme", name=enz, enzyme_id=enz)
+    for d in inhibitors:
+        g.add_edge(f"drug:{d}", "enzyme:CYP3A4", relation="inhibits", strength="strong")
+        g.add_edge(f"drug:{d}", "enzyme:CYP2D6", relation="inhibits", strength="moderate")
+    for d in substrates:
+        g.add_edge(f"drug:{d}", "enzyme:CYP3A4", relation="metabolized_by", strength="moderate")
+        g.add_edge(f"drug:{d}", "enzyme:CYP2D6", relation="metabolized_by", strength="weak")
+    return g, all_ids
+
+
+class TestPathFinderMultiDrug:
+    pf = PathFinder()
+
+    def test_pathfinder_six_drugs_finds_cascades(self):
+        """6-drug scenario: enzyme cascade paths between inhibitors and substrates are found."""
+        g, drug_ids = _six_drug_graph()
+        paths = self.pf.find_cascade_paths(g, drug_ids)
+        # Each of 3 inhibitors x 3 substrates = 9 unique cascade pairs expected
+        assert len(paths) >= 9, f"Expected >=9 cascade paths, got {len(paths)}"
+        # All returned paths should have net_severity set (not empty)
+        assert all(p.net_severity in ("critical", "major", "moderate", "minor") for p in paths)
+        # Verify depth-3 paths (drug->enzyme->drug) are included via enzyme_ids
+        assert all(len(p.enzyme_ids) >= 1 for p in paths)
+
+    def test_pathfinder_ten_drugs_completes_within_timeout(self):
+        """10-drug scenario must return within 5 seconds (BFS timeout guard active)."""
+        import time
+
+        g, drug_ids = _ten_drug_graph()
+        start = time.monotonic()
+        paths = self.pf.find_cascade_paths(g, drug_ids)
+        elapsed = time.monotonic() - start
+
+        assert elapsed < 5.0, f"find_cascade_paths took {elapsed:.2f}s — exceeds 5s budget"
+        # Should still return results (enzyme cascade paths are found via fast O(n) path)
+        assert len(paths) >= 1
+
+    def test_pathfinder_dedup_uses_structured_key(self):
+        """
+        No duplicate paths with the same drug pair + enzyme set should be present.
+        The dedup key is (drug_a_name, drug_b_name, frozenset(enzyme_ids)).
+        """
+        g, drug_ids = _six_drug_graph()
+        paths = self.pf.find_cascade_paths(g, drug_ids)
+
+        seen: set[tuple] = set()
+        for p in paths:
+            key = (p.drug_a_name, p.drug_b_name, frozenset(p.enzyme_ids))
+            rev_key = (p.drug_b_name, p.drug_a_name, frozenset(p.enzyme_ids))
+            assert key not in seen, f"Duplicate path found: {key}"
+            assert rev_key not in seen, f"Duplicate reverse path found: {rev_key}"
+            seen.add(key)

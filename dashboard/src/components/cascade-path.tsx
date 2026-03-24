@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { lazy, Suspense } from "react";
 import type { CascadePath as CascadePathType } from "@/lib/types";
 
 interface CascadePathProps {
@@ -31,31 +31,74 @@ function getRelationBg(relation: string) {
   return RELATION_BG[key] ?? RELATION_BG.default;
 }
 
-export function CascadePath({ path }: CascadePathProps) {
+const CascadePathAnimated = lazy(() =>
+  import("framer-motion").then(({ motion }) => ({
+    default: function CascadePathAnimatedInner({ path }: CascadePathProps) {
+      return (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {path.steps.map((step, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="flex items-center gap-2"
+              >
+                {index === 0 && (
+                  <div className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm font-medium shadow-sm">
+                    {step.source}
+                  </div>
+                )}
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className={`text-xs font-medium ${getRelationColor(step.relation)}`}>
+                    {step.relation}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <div className="h-0.5 w-8 bg-[var(--border)]" />
+                    <div className="h-0 w-0 border-t-4 border-b-4 border-l-6 border-t-transparent border-b-transparent border-l-[var(--muted-foreground)]" />
+                  </div>
+                  {step.effect && (
+                    <span className="text-xs text-[var(--muted-foreground)]">
+                      {step.effect}
+                    </span>
+                  )}
+                </div>
+                <div className={`rounded-md border px-3 py-1.5 text-sm font-medium shadow-sm ${getRelationBg(step.relation)}`}>
+                  {step.target}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+          {path.description && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: path.steps.length * 0.1 }}
+              className="text-sm text-[var(--muted-foreground)] leading-relaxed"
+            >
+              {path.description}
+            </motion.p>
+          )}
+        </div>
+      );
+    },
+  }))
+);
+
+function CascadePathFallback({ path }: CascadePathProps) {
   return (
     <div className="space-y-3">
-      {/* Flow diagram */}
       <div className="flex flex-wrap items-center gap-2">
         {path.steps.map((step, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="flex items-center gap-2"
-          >
-            {/* Source node */}
+          <div key={index} className="flex items-center gap-2">
             {index === 0 && (
               <div className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm font-medium shadow-sm">
                 {step.source}
               </div>
             )}
-
-            {/* Arrow + relation label */}
             <div className="flex flex-col items-center gap-0.5">
-              <span
-                className={`text-xs font-medium ${getRelationColor(step.relation)}`}
-              >
+              <span className={`text-xs font-medium ${getRelationColor(step.relation)}`}>
                 {step.relation}
               </span>
               <div className="flex items-center gap-1">
@@ -68,28 +111,25 @@ export function CascadePath({ path }: CascadePathProps) {
                 </span>
               )}
             </div>
-
-            {/* Target node */}
-            <div
-              className={`rounded-md border px-3 py-1.5 text-sm font-medium shadow-sm ${getRelationBg(step.relation)}`}
-            >
+            <div className={`rounded-md border px-3 py-1.5 text-sm font-medium shadow-sm ${getRelationBg(step.relation)}`}>
               {step.target}
             </div>
-          </motion.div>
+          </div>
         ))}
       </div>
-
-      {/* Description */}
       {path.description && (
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: path.steps.length * 0.1 }}
-          className="text-sm text-[var(--muted-foreground)] leading-relaxed"
-        >
+        <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">
           {path.description}
-        </motion.p>
+        </p>
       )}
     </div>
+  );
+}
+
+export function CascadePath({ path }: CascadePathProps) {
+  return (
+    <Suspense fallback={<CascadePathFallback path={path} />}>
+      <CascadePathAnimated path={path} />
+    </Suspense>
   );
 }

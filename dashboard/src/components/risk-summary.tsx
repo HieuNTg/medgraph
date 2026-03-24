@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { lazy, Suspense, useRef } from "react";
 import {
   AlertOctagon,
   AlertTriangle,
@@ -7,7 +7,6 @@ import {
   Download,
   Clock,
 } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { CheckResponse } from "@/lib/types";
@@ -28,6 +27,42 @@ const RISK_CONFIG: Record<
 };
 
 const SEVERITY_ORDER = ["critical", "major", "moderate", "minor"];
+
+interface DonutProps {
+  pieData: { name: string; value: number; color: string }[];
+}
+
+const SeverityDonut = lazy(() =>
+  import("recharts").then(({ PieChart, Pie, Cell, ResponsiveContainer, Tooltip }) => ({
+    default: function SeverityDonutInner({ pieData }: DonutProps) {
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={pieData}
+              cx="50%"
+              cy="50%"
+              innerRadius="55%"
+              outerRadius="80%"
+              dataKey="value"
+              strokeWidth={0}
+            >
+              {pieData.map((entry, i) => (
+                <Cell key={i} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(value, name) => [
+                `${value} interaction${Number(value) !== 1 ? "s" : ""}`,
+                (name as string).charAt(0).toUpperCase() + (name as string).slice(1),
+              ]}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      );
+    },
+  }))
+);
 
 export function RiskSummary({ response }: RiskSummaryProps) {
   const summaryRef = useRef<HTMLDivElement>(null);
@@ -118,30 +153,9 @@ export function RiskSummary({ response }: RiskSummaryProps) {
         {pieData.length > 0 && (
           <div className="flex items-center gap-6">
             <div className="h-32 w-32 shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius="55%"
-                    outerRadius="80%"
-                    dataKey="value"
-                    strokeWidth={0}
-                  >
-                    {pieData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value, name) => [
-                      `${value} interaction${Number(value) !== 1 ? "s" : ""}`,
-                      (name as string).charAt(0).toUpperCase() +
-                        (name as string).slice(1),
-                    ]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <Suspense fallback={<div className="h-full w-full rounded-full bg-[var(--secondary)] animate-pulse" />}>
+                <SeverityDonut pieData={pieData} />
+              </Suspense>
             </div>
 
             <div className="space-y-2">

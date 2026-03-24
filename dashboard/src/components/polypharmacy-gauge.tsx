@@ -68,7 +68,13 @@ export function PolypharmacyGauge({ data }: PolypharmacyGaugeProps) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4">
       <div className="flex flex-col items-center">
-        <svg width={W} height={H} aria-label={`Polypharmacy risk gauge: ${score.toFixed(0)}`}>
+        <svg
+          width={W}
+          height={H}
+          role="img"
+          aria-label={`Polypharmacy risk gauge: ${score.toFixed(0)} out of 100, ${config.label}`}
+        >
+          <title>Polypharmacy Risk Assessment</title>
           {/* Background track */}
           <path
             d={arcPath(cx, cy, R, startAngle, endAngle)}

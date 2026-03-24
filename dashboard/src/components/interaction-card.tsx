@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import {
   AlertOctagon,
   AlertTriangle,
@@ -52,7 +52,7 @@ const SEVERITY_CONFIG = {
   },
 };
 
-export function InteractionCard({ interaction }: InteractionCardProps) {
+export const InteractionCard = memo(function InteractionCard({ interaction }: InteractionCardProps) {
   const [showCascade, setShowCascade] = useState(false);
   const [showEvidence, setShowEvidence] = useState(false);
 
@@ -67,7 +67,9 @@ export function InteractionCard({ interaction }: InteractionCardProps) {
           <div className="flex items-center gap-3">
             <Icon
               className={`h-5 w-5 shrink-0 severity-${interaction.severity}`}
+              aria-hidden="true"
             />
+            <span className="sr-only">{config.label} severity:</span>
             <div>
               <h3 className="font-semibold text-[var(--foreground)]">
                 {interaction.drug_a.name} + {interaction.drug_b.name}
@@ -182,4 +184,4 @@ export function InteractionCard({ interaction }: InteractionCardProps) {
       </CardContent>
     </Card>
   );
-}
+});

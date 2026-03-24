@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 import networkx as nx
 
+from medgraph.engine.enzyme_indexer import EnzymeIndexer
 from medgraph.graph.models import MEDICAL_DISCLAIMER
 from medgraph.graph.store import GraphStore
 
@@ -176,36 +177,7 @@ class Deprescriber:
         Build pair → severity dict for enzyme cascade conflicts among drug_ids.
         Uses the same inhibitor/inducer/substrate patterns as ContraindicationNetwork.
         """
-        # enzyme_id -> {inhibitors, inducers, substrates} for these drugs only
-        enzyme_index: dict[str, dict[str, set[str]]] = {}
-        drug_nodes = {f"drug:{did}" for did in drug_ids}
-
-        for drug_node in drug_nodes:
-            if drug_node not in self.graph:
-                continue
-            drug_id = self.graph.nodes[drug_node].get("drug_id", drug_node.replace("drug:", ""))
-            for enzyme_node in self.graph.successors(drug_node):
-                if self.graph.nodes[enzyme_node].get("node_type") != "enzyme":
-                    continue
-                enzyme_id = self.graph.nodes[enzyme_node].get(
-                    "enzyme_id", enzyme_node.replace("enzyme:", "")
-                )
-                edge = self.graph.edges.get((drug_node, enzyme_node), {})
-                relation = edge.get("relation", "")
-                if relation not in ("inhibits", "induces", "metabolized_by"):
-                    continue
-                if enzyme_id not in enzyme_index:
-                    enzyme_index[enzyme_id] = {
-                        "inhibitors": set(),
-                        "inducers": set(),
-                        "substrates": set(),
-                    }
-                if relation == "inhibits":
-                    enzyme_index[enzyme_id]["inhibitors"].add(drug_id)
-                elif relation == "induces":
-                    enzyme_index[enzyme_id]["inducers"].add(drug_id)
-                elif relation == "metabolized_by":
-                    enzyme_index[enzyme_id]["substrates"].add(drug_id)
+        enzyme_index = EnzymeIndexer(self.graph).build_index(drug_ids)
 
         conflicts: dict[frozenset, str] = {}
         for enzyme_id, groups in enzyme_index.items():

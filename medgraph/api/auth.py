@@ -61,9 +61,17 @@ def _get_client_id(request: Request) -> str:
     """Derive a rate-limit key from request. Uses API key if present, else IP."""
     api_key = request.headers.get("x-api-key", "")
     if api_key:
-        return f"key:{hashlib.sha256(api_key.encode()).hexdigest()[:16]}"
+        return f"key:{hashlib.sha256(api_key.encode()).hexdigest()[:32]}"
     client_ip = request.client.host if request.client else "unknown"
     return f"ip:{client_ip}"
+
+
+def _prune_request_log(now: float) -> None:
+    """Remove all keys with no timestamps within the current window."""
+    window_start = now - RATE_WINDOW
+    stale = [k for k, v in _request_log.items() if not v or v[-1] <= window_start]
+    for k in stale:
+        del _request_log[k]
 
 
 def _check_rate_limit(client_id: str) -> bool:
@@ -71,7 +79,11 @@ def _check_rate_limit(client_id: str) -> bool:
     now = time.monotonic()
     window_start = now - RATE_WINDOW
 
-    # Prune old entries
+    # Bounded growth: prune when dict exceeds 10,000 keys
+    if len(_request_log) > 10_000:
+        _prune_request_log(now)
+
+    # Prune old entries for this client
     timestamps = _request_log[client_id]
     _request_log[client_id] = [t for t in timestamps if t > window_start]
 

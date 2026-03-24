@@ -64,6 +64,33 @@ class GraphBuilder:
                     strength=rel.strength,
                 )
 
+        # Add food item nodes + food->enzyme edges
+        food_interactions = store.get_food_interactions(
+            [drug.id for drug in store.get_all_drugs()]
+        )
+        seen_foods: dict[str, dict] = {}
+        for fi in food_interactions:
+            food_node = f"food:{fi['food_name']}"
+            if food_node not in seen_foods:
+                seen_foods[food_node] = fi
+                g.add_node(
+                    food_node,
+                    node_type="food",
+                    food_id=fi["id"].rsplit("_", maxsplit=1)[0] if "_" in fi["id"] else fi["id"],
+                    name=fi["food_name"],
+                    category=fi["food_category"],
+                )
+            # food -> drug edge
+            drug_node = f"drug:{fi['drug_id']}"
+            if drug_node in g:
+                g.add_edge(
+                    food_node,
+                    drug_node,
+                    relation="food_interaction",
+                    severity=fi["severity"],
+                    mechanism=fi.get("mechanism") or "",
+                )
+
         # Add drug->drug edges (direct interactions — bidirectional)
         for interaction in store.get_all_interactions():
             src = f"drug:{interaction.drug_a_id}"

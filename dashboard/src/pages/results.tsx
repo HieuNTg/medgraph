@@ -1,5 +1,6 @@
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   RotateCcw,
@@ -111,23 +112,53 @@ export function ResultsPage() {
   const [graphWidth, setGraphWidth] = useState(700);
   const [exporting, setExporting] = useState(false);
 
-  // Graph / advanced data state
-  const [pathwayData, setPathwayData] = useState<PathwayResponse | null>(null);
-  const [contraindicationData, setContraindicationData] =
-    useState<ContraindicationResponse | null>(null);
-  const [deprescribingData, setDeprescribingData] = useState<
-    DeprescribingResponse[]
-  >([]);
-  const [pathwayError, setPathwayError] = useState<string | null>(null);
-  const [contraindicationError, setContraindicationError] = useState<
-    string | null
-  >(null);
-  const [deprescribingError, setDeprescribingError] = useState<string | null>(
-    null
-  );
-  const [pathwayLoading, setPathwayLoading] = useState(false);
-  const [contraindicationLoading, setContraindicationLoading] = useState(false);
-  const [deprescribingLoading, setDeprescribingLoading] = useState(false);
+  const drugIds = state?.result?.drugs?.map((d) => d.id) ?? [];
+
+  const {
+    data: pathwayData,
+    isLoading: pathwayLoading,
+    error: pathwayQueryError,
+  } = useQuery<PathwayResponse>({
+    queryKey: ["pathways", drugIds],
+    queryFn: () => getPathways(drugIds),
+    enabled: drugIds.length > 0,
+  });
+
+  const {
+    data: contraindicationData,
+    isLoading: contraindicationLoading,
+    error: contraindicationQueryError,
+  } = useQuery<ContraindicationResponse>({
+    queryKey: ["contraindications", drugIds],
+    queryFn: () => getContraindications(drugIds),
+    enabled: drugIds.length > 0,
+  });
+
+  const {
+    data: deprescribingData,
+    isLoading: deprescribingLoading,
+    error: deprescribingQueryError,
+  } = useQuery<DeprescribingResponse[]>({
+    queryKey: ["deprescribing", drugIds],
+    queryFn: () => getDeprescribingRecs(drugIds),
+    enabled: drugIds.length > 0,
+  });
+
+  const pathwayError = pathwayQueryError
+    ? pathwayQueryError instanceof Error
+      ? pathwayQueryError.message
+      : "Failed to load pathways"
+    : null;
+  const contraindicationError = contraindicationQueryError
+    ? contraindicationQueryError instanceof Error
+      ? contraindicationQueryError.message
+      : "Failed to load contraindications"
+    : null;
+  const deprescribingError = deprescribingQueryError
+    ? deprescribingQueryError instanceof Error
+      ? deprescribingQueryError.message
+      : "Failed to load deprescribing data"
+    : null;
 
   useEffect(() => {
     if (!state?.result) {
@@ -147,44 +178,6 @@ export function ResultsPage() {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-
-  // Fetch advanced graph data once we have drug IDs
-  useEffect(() => {
-    if (!state?.result?.drugs?.length) return;
-    const ids = state.result.drugs.map((d) => d.id);
-    if (!ids.length) return;
-
-    // Pathway data
-    setPathwayLoading(true);
-    getPathways(ids)
-      .then(setPathwayData)
-      .catch((e: unknown) =>
-        setPathwayError(e instanceof Error ? e.message : "Failed to load pathways")
-      )
-      .finally(() => setPathwayLoading(false));
-
-    // Contraindication matrix
-    setContraindicationLoading(true);
-    getContraindications(ids)
-      .then(setContraindicationData)
-      .catch((e: unknown) =>
-        setContraindicationError(
-          e instanceof Error ? e.message : "Failed to load contraindications"
-        )
-      )
-      .finally(() => setContraindicationLoading(false));
-
-    // Deprescribing
-    setDeprescribingLoading(true);
-    getDeprescribingRecs(ids)
-      .then(setDeprescribingData)
-      .catch((e: unknown) =>
-        setDeprescribingError(
-          e instanceof Error ? e.message : "Failed to load deprescribing data"
-        )
-      )
-      .finally(() => setDeprescribingLoading(false));
-  }, [state?.result]);
 
   if (!state?.result) return null;
 
@@ -352,8 +345,11 @@ export function ResultsPage() {
           <h2 className="font-semibold text-[var(--foreground)]">
             {sorted.length} Interaction{sorted.length !== 1 ? "s" : ""} Found
           </h2>
-          {sorted.map((interaction, i) => (
-            <InteractionCard key={i} interaction={interaction} />
+          {sorted.map((interaction) => (
+            <InteractionCard
+              key={`${interaction.drug_a.id}-${interaction.drug_b.id}`}
+              interaction={interaction}
+            />
           ))}
         </div>
       ) : (
@@ -375,7 +371,7 @@ export function ResultsPage() {
         defaultOpen={false}
       >
         <DeprescribingPanel
-          recommendations={deprescribingData}
+          recommendations={deprescribingData ?? []}
           loading={deprescribingLoading}
           error={deprescribingError}
         />

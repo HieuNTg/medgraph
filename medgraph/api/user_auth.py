@@ -10,9 +10,13 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
+
+_logger = logging.getLogger(__name__)
+_DEV_SECRET = "medgraph-dev-secret"
 
 
 def _b64url_encode(data: bytes) -> str:
@@ -32,9 +36,22 @@ class UserAuth:
 
     _HASH_ITERATIONS = 260_000  # OWASP recommended for pbkdf2_hmac/sha256
 
-    def __init__(self, store, secret_key: str = "medgraph-dev-secret") -> None:
+    # Maps user_id -> set of valid refresh token jti values
+    _refresh_tokens: dict[str, set[str]] = {}
+
+    def __init__(self, store, secret_key: str | None = None) -> None:
         self.store = store
-        self.secret_key = secret_key.encode()
+        resolved_secret = secret_key or os.environ.get("MEDGRAPH_JWT_SECRET", _DEV_SECRET)
+        if os.environ.get("MEDGRAPH_ENV") == "production" and resolved_secret == _DEV_SECRET:
+            raise RuntimeError(
+                "MEDGRAPH_JWT_SECRET must be set to a strong secret in production. "
+                "Do not use the default development secret."
+            )
+        if resolved_secret == _DEV_SECRET:
+            _logger.warning(
+                "Using default dev JWT secret. Set MEDGRAPH_JWT_SECRET for any shared environment."
+            )
+        self.secret_key = resolved_secret.encode()
         self.access_token_expiry = timedelta(minutes=15)
         self.refresh_token_expiry = timedelta(days=7)
 
@@ -66,9 +83,10 @@ class UserAuth:
     def _create_token(self, user_id: str, token_type: str, expiry: timedelta) -> str:
         now = datetime.now(timezone.utc)
         exp = int((now + expiry).timestamp())
+        jti = str(uuid.uuid4())
         header = _b64url_encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
         payload = _b64url_encode(
-            json.dumps({"sub": user_id, "exp": exp, "type": token_type}).encode()
+            json.dumps({"sub": user_id, "exp": exp, "type": token_type, "jti": jti}).encode()
         )
         signing_input = f"{header}.{payload}"
         sig = hmac.new(
@@ -152,9 +170,18 @@ class UserAuth:
         if not payload or payload.get("type") != "refresh":
             raise ValueError("Invalid or expired refresh token")
 
-        user = self.store.get_user_by_id(payload["sub"])
+        user_id = payload["sub"]
+        jti = payload.get("jti")
+        valid_jtis = UserAuth._refresh_tokens.get(user_id, set())
+        if jti not in valid_jtis:
+            raise ValueError("Refresh token has been revoked or already used")
+
+        user = self.store.get_user_by_id(user_id)
         if not user:
             raise ValueError("User not found")
+
+        # Invalidate old token before issuing new pair
+        valid_jtis.discard(jti)
         return self._build_token_response(user)
 
     def get_user(self, user_id: str) -> dict | None:
@@ -176,6 +203,10 @@ class UserAuth:
     def _build_token_response(self, user: dict) -> dict:
         access_token = self._create_token(user["id"], "access", self.access_token_expiry)
         refresh_token = self._create_token(user["id"], "refresh", self.refresh_token_expiry)
+        # Register the new refresh token's jti so it can be validated on use
+        rt_payload = self.verify_token(refresh_token)
+        if rt_payload and rt_payload.get("jti"):
+            UserAuth._refresh_tokens.setdefault(user["id"], set()).add(rt_payload["jti"])
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,

@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 import networkx as nx
 
+from medgraph.engine.enzyme_indexer import EnzymeIndexer
 from medgraph.graph.store import GraphStore
 
 logger = logging.getLogger(__name__)
@@ -151,35 +152,7 @@ class ContraindicationNetwork:
         Build enzyme → {inhibitors, inducers, substrates} index from graph nodes.
         Only considers drugs in drug_ids.
         """
-        drug_nodes = {f"drug:{did}" for did in drug_ids}
-        index: dict[str, dict[str, set[str]]] = {}
-
-        for drug_node in drug_nodes:
-            if drug_node not in self.graph:
-                continue
-            drug_id = self.graph.nodes[drug_node].get("drug_id", drug_node.replace("drug:", ""))
-            for enzyme_node in self.graph.successors(drug_node):
-                if self.graph.nodes[enzyme_node].get("node_type") != "enzyme":
-                    continue
-                enzyme_id = self.graph.nodes[enzyme_node].get(
-                    "enzyme_id", enzyme_node.replace("enzyme:", "")
-                )
-                edge = self.graph.edges.get((drug_node, enzyme_node), {})
-                relation = edge.get("relation", "")
-                if relation not in ("inhibits", "induces", "metabolized_by"):
-                    continue
-
-                if enzyme_id not in index:
-                    index[enzyme_id] = {"inhibitors": set(), "inducers": set(), "substrates": set()}
-
-                if relation == "inhibits":
-                    index[enzyme_id]["inhibitors"].add(drug_id)
-                elif relation == "induces":
-                    index[enzyme_id]["inducers"].add(drug_id)
-                elif relation == "metabolized_by":
-                    index[enzyme_id]["substrates"].add(drug_id)
-
-        return index
+        return EnzymeIndexer(self.graph).build_index(drug_ids)
 
     def _detect_cascade_conflicts(
         self,

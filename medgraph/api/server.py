@@ -77,6 +77,7 @@ from medgraph.api.models import (
     DrugResponse,
     EnzymeRelationResponse,
     EvidenceResponse,
+    FoodInteractionResponse,
     HealthResponse,
     HubDrugResponse,
     InteractionResponse,
@@ -365,6 +366,43 @@ def create_app() -> FastAPI:
         )
 
     @router.get(
+        "/food-interactions",
+        response_model=list[FoodInteractionResponse],
+        tags=["analysis"],
+        dependencies=_api_deps,
+    )
+    async def get_food_interactions(
+        drugs: str = Query(..., description="Comma-separated drug names"),
+    ) -> list[FoodInteractionResponse]:
+        """Return food/supplement interactions for the given drugs via CYP450 pathways."""
+        store: GraphStore = app.state.store
+        searcher: DrugSearcher = app.state.searcher
+
+        drug_names = [n.strip() for n in drugs.split(",") if n.strip()]
+        if not drug_names:
+            raise HTTPException(status_code=400, detail="At least one drug name required")
+
+        drug_ids = []
+        for name in drug_names:
+            matches = searcher.search(name, limit=1)
+            if matches:
+                drug_ids.append(matches[0].id)
+
+        rows = store.get_food_interactions(drug_ids)
+        return [
+            FoodInteractionResponse(
+                food_name=r["food_name"],
+                food_category=r["food_category"],
+                drug_id=r["drug_id"],
+                severity=r["severity"],
+                description=r["description"],
+                mechanism=r.get("mechanism"),
+                evidence_level=r.get("evidence_level", "C"),
+            )
+            for r in rows
+        ]
+
+    @router.get(
         "/drugs/search",
         response_model=PaginatedResponse[SearchResult],
         tags=["drugs"],
@@ -589,6 +627,21 @@ def create_app() -> FastAPI:
                 )
             )
 
+        # Fetch food interactions for all resolved drugs
+        food_rows = store.get_food_interactions(drug_ids)
+        food_interactions_resp = [
+            FoodInteractionResponse(
+                food_name=r["food_name"],
+                food_category=r["food_category"],
+                drug_id=r["drug_id"],
+                severity=r["severity"],
+                description=r["description"],
+                mechanism=r.get("mechanism"),
+                evidence_level=r.get("evidence_level", "C"),
+            )
+            for r in food_rows
+        ]
+
         check_response = CheckResponse(
             drugs=drugs_response,
             interactions=interactions_response,
@@ -599,6 +652,7 @@ def create_app() -> FastAPI:
             timestamp=datetime.now(timezone.utc).isoformat(),
             disclaimer=DISCLAIMER,
             summary=explain_report(report),
+            food_interactions=food_interactions_resp,
         )
 
         # Auto-save to analysis history
@@ -728,7 +782,11 @@ def create_app() -> FastAPI:
         store: GraphStore = app.state.store
         graph = app.state.graph
         finder = AlternativesFinder(graph, store)
-        results = finder.find_alternatives(request.drug_id, request.regimen)
+        try:
+            results = finder.find_alternatives(request.drug_id, request.regimen)
+        except Exception as exc:
+            logger.exception("Alternatives engine error: %s", exc)
+            raise HTTPException(status_code=503, detail="Alternatives engine failed")
         return [
             AlternativeResponse(
                 drug_id=alt.drug_id,
@@ -823,7 +881,11 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=503, detail="Centrality engine not available")
         graph = app.state.graph
         analyzer_obj = CentralityAnalyzer(graph)
-        hubs = analyzer_obj.hub_drugs(top_n)
+        try:
+            hubs = analyzer_obj.hub_drugs(top_n)
+        except Exception as exc:
+            logger.exception("Hub-drugs engine error: %s", exc)
+            raise HTTPException(status_code=503, detail="Centrality engine failed")
         return [
             HubDrugResponse(
                 drug_id=h.drug_id,
@@ -853,7 +915,11 @@ def create_app() -> FastAPI:
         graph = app.state.graph
         store: GraphStore = app.state.store
         network = ContraindicationNetwork(graph, store)
-        result = network.build_network(drug_ids)
+        try:
+            result = network.build_network(drug_ids)
+        except Exception as exc:
+            logger.exception("Contraindications engine error: %s", exc)
+            raise HTTPException(status_code=503, detail="Contraindication engine failed")
         return ContraindicationResponse(
             nodes=result.get("nodes", []),
             edges=result.get("edges", []),
@@ -875,7 +941,11 @@ def create_app() -> FastAPI:
         graph = app.state.graph
         store: GraphStore = app.state.store
         deprescriber = Deprescriber(graph, store)
-        recs = deprescriber.recommend(request.drugs)
+        try:
+            recs = deprescriber.recommend(request.drugs)
+        except Exception as exc:
+            logger.exception("Deprescriber engine error: %s", exc)
+            raise HTTPException(status_code=503, detail="Deprescriber engine failed")
         return [
             DeprescribingResponse(
                 drug_id=rec.drug_id,
@@ -1215,7 +1285,11 @@ def create_app() -> FastAPI:
 
         drug_ids = [d.id for d in found_drugs]
         optimizer = PolypharmacyOptimizer(graph, store)
-        result = optimizer.optimize(drug_ids, must_keep=must_keep_ids)
+        try:
+            result = optimizer.optimize(drug_ids, must_keep=must_keep_ids)
+        except Exception as exc:
+            logger.exception("Optimizer engine error: %s", exc)
+            raise HTTPException(status_code=503, detail="Optimizer engine failed")
 
         return OptimizeResponse(
             original_risk=result.original_risk,

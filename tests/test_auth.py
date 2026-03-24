@@ -6,17 +6,20 @@ Covers:
 - Auth enabled: valid key passes, invalid/missing key returns 401
 - Rate limiting: requests within limit pass, exceeding limit returns 429
 - Health endpoint: always accessible regardless of auth/rate limit
+- JWT security: production secret validation, refresh token rotation, single-use
+- Rate limit pruning: memory leak prevention for large request logs
 """
 
 from __future__ import annotations
 
 import os
+import time
 
 import pytest
 from fastapi.testclient import TestClient
 
 import medgraph.api.auth as auth_module
-from medgraph.api.auth import reset_rate_limits, reload_api_keys
+from medgraph.api.auth import reset_rate_limits, reload_api_keys, _request_log
 from medgraph.api.server import create_app
 from medgraph.engine.analyzer import CascadeAnalyzer
 from medgraph.api.search import DrugSearcher
@@ -182,3 +185,120 @@ class TestRateLimiting:
 
         resp = client.post("/api/check", json={"drugs": ["Warfarin", "Aspirin"]})
         assert resp.status_code == 429
+
+
+# ---------------------------------------------------------------------------
+# JWT security tests
+# ---------------------------------------------------------------------------
+
+
+class TestJWTSecurity:
+    """Tests for UserAuth JWT secret validation and refresh token rotation."""
+
+    def _make_store(self, tmp_path_factory):
+        """Create a minimal in-memory-backed store for JWT tests."""
+        from medgraph.graph.store import GraphStore
+
+        tmp_path = tmp_path_factory.mktemp("jwt_test")
+        store = GraphStore(tmp_path / "jwt_test.db")
+        return store
+
+    def _make_user_auth(self, store, secret_key=None):
+        from medgraph.api.user_auth import UserAuth
+
+        return UserAuth(store, secret_key=secret_key)
+
+    def _register_user(self, ua):
+        """Register a throwaway user and return tokens."""
+        import uuid
+
+        email = f"test_{uuid.uuid4().hex[:8]}@example.com"
+        return ua.register(email=email, password="Password123!", display_name="Test")
+
+    def test_jwt_default_secret_raises_in_production(self, tmp_path_factory) -> None:
+        """UserAuth should raise RuntimeError when MEDGRAPH_ENV=production and no secret set."""
+        from medgraph.api.user_auth import UserAuth
+
+        store = self._make_store(tmp_path_factory)
+        old_env = os.environ.get("MEDGRAPH_ENV")
+        old_secret = os.environ.get("MEDGRAPH_JWT_SECRET")
+        try:
+            os.environ["MEDGRAPH_ENV"] = "production"
+            os.environ.pop("MEDGRAPH_JWT_SECRET", None)
+            with pytest.raises(RuntimeError, match="MEDGRAPH_JWT_SECRET"):
+                UserAuth(store)  # no secret_key passed, env secret absent → dev secret → raises
+        finally:
+            if old_env is None:
+                os.environ.pop("MEDGRAPH_ENV", None)
+            else:
+                os.environ["MEDGRAPH_ENV"] = old_env
+            if old_secret is None:
+                os.environ.pop("MEDGRAPH_JWT_SECRET", None)
+            else:
+                os.environ["MEDGRAPH_JWT_SECRET"] = old_secret
+
+    def test_jwt_refresh_token_rotation(self, tmp_path_factory) -> None:
+        """After a successful refresh, old refresh token must be invalid."""
+        store = self._make_store(tmp_path_factory)
+        ua = self._make_user_auth(store, secret_key="test-secret-key-strong")
+
+        tokens = self._register_user(ua)
+        original_rt = tokens["refresh_token"]
+
+        # First refresh succeeds and returns new tokens
+        new_tokens = ua.refresh(original_rt)
+        assert "refresh_token" in new_tokens
+        assert new_tokens["refresh_token"] != original_rt
+
+        # Old refresh token is now invalid (rotated out)
+        with pytest.raises(ValueError, match="revoked|already used"):
+            ua.refresh(original_rt)
+
+    def test_jwt_refresh_token_single_use(self, tmp_path_factory) -> None:
+        """Same refresh token used twice consecutively — second attempt must fail."""
+        store = self._make_store(tmp_path_factory)
+        ua = self._make_user_auth(store, secret_key="test-secret-key-strong")
+
+        tokens = self._register_user(ua)
+        rt = tokens["refresh_token"]
+
+        # First use succeeds
+        ua.refresh(rt)
+
+        # Second use with the SAME token fails
+        with pytest.raises(ValueError):
+            ua.refresh(rt)
+
+
+# ---------------------------------------------------------------------------
+# Rate limit pruning test
+# ---------------------------------------------------------------------------
+
+
+class TestRateLimitPruning:
+    def test_rate_limit_prunes_old_entries(self) -> None:
+        """
+        When _request_log exceeds 10,000 keys, stale entries are pruned.
+        After pruning, the dict should not grow unboundedly.
+        """
+        reset_rate_limits()
+        # Populate 10,001 fake stale client entries (timestamps far in the past)
+        past_time = time.monotonic() - auth_module.RATE_WINDOW - 10
+        for i in range(10_001):
+            _request_log[f"ip:192.0.2.{i % 256}_{i}"] = [past_time]
+
+        assert len(_request_log) > 10_000
+
+        # Triggering _check_rate_limit on any new client triggers pruning
+        from medgraph.api.auth import _check_rate_limit
+
+        allowed = _check_rate_limit("ip:trigger-prune")
+        assert allowed is True  # new client should be allowed
+
+        # After pruning, stale keys should be removed — dict size should be small
+        # (only the trigger client remains plus any non-stale entries)
+        assert len(_request_log) < 10_001, (
+            f"Expected pruning to reduce dict, still have {len(_request_log)} entries"
+        )
+
+        reset_rate_limits()  # cleanup

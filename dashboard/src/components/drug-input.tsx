@@ -157,6 +157,11 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
               aria-autocomplete="list"
               aria-expanded={open}
               aria-controls="drug-search-listbox"
+              aria-activedescendant={
+                open && highlightedIndex >= 0
+                  ? `drug-option-${highlightedIndex}`
+                  : undefined
+              }
             />
             {searching && (
               <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[var(--muted-foreground)]" />
@@ -183,6 +188,7 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
             {filteredResults.map((drug, index) => (
               <button
                 key={drug.id}
+                id={`drug-option-${index}`}
                 role="option"
                 aria-selected={index === highlightedIndex}
                 onClick={() => selectDrug(drug)}

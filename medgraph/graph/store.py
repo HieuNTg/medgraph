@@ -39,6 +39,7 @@ class GraphStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.init_db()
         self._ensure_schema_metadata()
+        self._backfill_adverse_event_drugs()
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
@@ -125,6 +126,12 @@ class GraphStore:
                     ON audit_log(user_id);
                 CREATE INDEX IF NOT EXISTS idx_audit_created
                     ON audit_log(created_at);
+                CREATE INDEX IF NOT EXISTS idx_analysis_user_created
+                    ON analysis_history(user_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_shared_expires
+                    ON shared_results(expires_at);
+                CREATE INDEX IF NOT EXISTS idx_audit_user_created
+                    ON audit_log(user_id, created_at DESC);
 
                 CREATE TABLE IF NOT EXISTS drugs (
                     id          TEXT PRIMARY KEY,
@@ -191,6 +198,16 @@ class GraphStore:
                     source_url  TEXT
                 );
 
+                CREATE TABLE IF NOT EXISTS adverse_event_drugs (
+                    event_id TEXT NOT NULL,
+                    drug_id  TEXT NOT NULL,
+                    PRIMARY KEY (event_id, drug_id),
+                    FOREIGN KEY (event_id) REFERENCES adverse_events(id),
+                    FOREIGN KEY (drug_id) REFERENCES drugs(id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_aed_drug_id ON adverse_event_drugs(drug_id);
+
                 CREATE TABLE IF NOT EXISTS genetic_guidelines (
                     drug_id              TEXT NOT NULL,
                     gene_id              TEXT NOT NULL,
@@ -199,6 +216,20 @@ class GraphStore:
                     severity_multiplier  REAL NOT NULL DEFAULT 1.0,
                     PRIMARY KEY (drug_id, gene_id, phenotype)
                 );
+
+                CREATE TABLE IF NOT EXISTS food_interactions (
+                    id TEXT PRIMARY KEY,
+                    food_name TEXT NOT NULL,
+                    food_category TEXT NOT NULL,
+                    drug_id TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    mechanism TEXT,
+                    evidence_level TEXT DEFAULT 'C',
+                    FOREIGN KEY (drug_id) REFERENCES drugs(id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_food_drug ON food_interactions(drug_id);
 
                 -- Indexes for performance
                 CREATE INDEX IF NOT EXISTS idx_drugs_name
@@ -335,6 +366,14 @@ class GraphStore:
                     event.seriousness,
                     event.source_url,
                 ),
+            )
+            # Keep junction table in sync
+            conn.execute(
+                "DELETE FROM adverse_event_drugs WHERE event_id = ?", (event.id,)
+            )
+            conn.executemany(
+                "INSERT OR IGNORE INTO adverse_event_drugs (event_id, drug_id) VALUES (?, ?)",
+                [(event.id, did) for did in event.drug_ids],
             )
 
     def upsert_evidence_source(self, source: EvidenceSource) -> None:
@@ -499,29 +538,28 @@ class GraphStore:
     def get_adverse_events(self, drug_ids: list[str]) -> list[AdverseEvent]:
         if not drug_ids:
             return []
-        # Pre-filter with LIKE to avoid full table scan, then verify in Python
-        like_clauses = " OR ".join(["drug_ids LIKE ?"] * len(drug_ids))
-        like_params = [f"%{did}%" for did in drug_ids]
+        placeholders = ",".join("?" * len(drug_ids))
         with self._connect() as conn:
             rows = conn.execute(
-                f"SELECT * FROM adverse_events WHERE {like_clauses}", like_params
+                f"""
+                SELECT DISTINCT ae.*
+                FROM adverse_events ae
+                JOIN adverse_event_drugs aed ON ae.id = aed.event_id
+                WHERE aed.drug_id IN ({placeholders})
+                """,
+                drug_ids,
             ).fetchall()
-        drug_set = set(drug_ids)
-        results = []
-        for row in rows:
-            ids = json.loads(row["drug_ids"])
-            if drug_set.intersection(ids):
-                results.append(
-                    AdverseEvent(
-                        id=row["id"],
-                        drug_ids=ids,
-                        reaction=row["reaction"],
-                        count=row["count"],
-                        seriousness=row["seriousness"],
-                        source_url=row["source_url"],
-                    )
-                )
-        return results
+        return [
+            AdverseEvent(
+                id=row["id"],
+                drug_ids=json.loads(row["drug_ids"]),
+                reaction=row["reaction"],
+                count=row["count"],
+                seriousness=row["seriousness"],
+                source_url=row["source_url"],
+            )
+            for row in rows
+        ]
 
     def upsert_genetic_guideline(self, g: GeneticGuideline) -> None:
         with self._connect() as conn:
@@ -873,6 +911,44 @@ class GraphStore:
             src_conn.close()
 
     # -------------------------------------------------------------------------
+    # Food Interactions
+    # -------------------------------------------------------------------------
+
+    def seed_food_interactions(self, food_data: list[dict]) -> None:
+        """Bulk insert/replace food interaction records."""
+        with self._connect() as conn:
+            for row in food_data:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO food_interactions
+                        (id, food_name, food_category, drug_id, severity, description, mechanism, evidence_level)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        row["id"],
+                        row["food_name"],
+                        row["food_category"],
+                        row["drug_id"],
+                        row["severity"],
+                        row["description"],
+                        row.get("mechanism"),
+                        row.get("evidence_level", "C"),
+                    ),
+                )
+
+    def get_food_interactions(self, drug_ids: list[str]) -> list[dict]:
+        """Return food interactions for the given drug IDs."""
+        if not drug_ids:
+            return []
+        placeholders = ",".join("?" * len(drug_ids))
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM food_interactions WHERE drug_id IN ({placeholders})",
+                drug_ids,
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    # -------------------------------------------------------------------------
     # Stats
     # -------------------------------------------------------------------------
 
@@ -891,6 +967,36 @@ class GraphStore:
     # -------------------------------------------------------------------------
     # Private helpers
     # -------------------------------------------------------------------------
+
+    def _backfill_adverse_event_drugs(self) -> None:
+        """Populate adverse_event_drugs from existing adverse_events rows.
+
+        Only runs when the junction table is empty, making it safe to call
+        on every startup without duplicating data.
+
+        FK enforcement is disabled during backfill because legacy rows may
+        reference drug IDs no longer present in the drugs table.
+        """
+        with self._connect() as conn:
+            count = conn.execute("SELECT COUNT(*) FROM adverse_event_drugs").fetchone()[0]
+            if count > 0:
+                return
+            rows = conn.execute("SELECT id, drug_ids FROM adverse_events").fetchall()
+            pairs = []
+            for row in rows:
+                try:
+                    ids = json.loads(row["drug_ids"])
+                except (ValueError, TypeError):
+                    ids = []
+                for did in ids:
+                    pairs.append((row["id"], did))
+            if pairs:
+                conn.execute("PRAGMA foreign_keys=OFF")
+                conn.executemany(
+                    "INSERT OR IGNORE INTO adverse_event_drugs (event_id, drug_id) VALUES (?, ?)",
+                    pairs,
+                )
+                conn.execute("PRAGMA foreign_keys=ON")
 
     @staticmethod
     def _row_to_drug(row: sqlite3.Row) -> Drug:

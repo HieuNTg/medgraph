@@ -99,7 +99,7 @@ class TestSecurityHeaders:
         assert "strict-transport-security" not in resp.headers
 
     def test_hsts_in_production(self, seeded_store: GraphStore) -> None:
-        with _make_client(seeded_store, {"MEDGRAPH_ENV": "production"}) as prod_client:
+        with _make_client(seeded_store, {"MEDGRAPH_ENV": "production", "MEDGRAPH_JWT_SECRET": "test-production-secret-key-for-ci"}) as prod_client:
             resp = prod_client.get("/health")
             assert "max-age=63072000" in resp.headers.get("strict-transport-security", "")
 

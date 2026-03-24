@@ -11,10 +11,13 @@ import os
 import tempfile
 from pathlib import Path
 
+import json
+import sqlite3
+
 import pytest
 
 from medgraph.graph.store import GraphStore
-from medgraph.graph.models import Drug
+from medgraph.graph.models import Drug, AdverseEvent
 
 
 @pytest.fixture
@@ -259,3 +262,141 @@ class TestHealthSchemaVersion:
 
         resp = HealthResponse(status="ok", db_size=100, graph_nodes=50)
         assert resp.schema_version == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Adverse event junction table
+# ---------------------------------------------------------------------------
+
+
+def _seed_drugs_and_event(store: GraphStore) -> AdverseEvent:
+    """Insert two drugs and one adverse event referencing both."""
+    store.upsert_drug(Drug(id="DRUG_A", name="DrugA", brand_names=[]))
+    store.upsert_drug(Drug(id="DRUG_B", name="DrugB", brand_names=[]))
+    event = AdverseEvent(
+        id="EVT001",
+        drug_ids=["DRUG_A", "DRUG_B"],
+        reaction="Nausea",
+        count=5,
+        seriousness="serious",
+        source_url=None,
+    )
+    store.upsert_adverse_event(event)
+    return event
+
+
+class TestAdverseEventJunctionTable:
+    def test_junction_table_created(self, store):
+        """adverse_event_drugs table exists after store init."""
+        conn = sqlite3.connect(store.db_path)
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='adverse_event_drugs'"
+        )
+        assert cursor.fetchone() is not None
+        conn.close()
+
+    def test_junction_populated_on_upsert(self, store):
+        """Upserting an adverse event populates adverse_event_drugs rows."""
+        _seed_drugs_and_event(store)
+        conn = sqlite3.connect(store.db_path)
+        rows = conn.execute(
+            "SELECT drug_id FROM adverse_event_drugs WHERE event_id = 'EVT001' ORDER BY drug_id"
+        ).fetchall()
+        conn.close()
+        drug_ids = [r[0] for r in rows]
+        assert drug_ids == ["DRUG_A", "DRUG_B"]
+
+    def test_query_returns_correct_events(self, store):
+        """get_adverse_events returns event when queried by any of its drug IDs."""
+        event = _seed_drugs_and_event(store)
+
+        result_a = store.get_adverse_events(["DRUG_A"])
+        assert len(result_a) == 1
+        assert result_a[0].id == event.id
+
+        result_b = store.get_adverse_events(["DRUG_B"])
+        assert len(result_b) == 1
+        assert result_b[0].id == event.id
+
+    def test_query_no_match_returns_empty(self, store):
+        """get_adverse_events returns empty list for unknown drug."""
+        _seed_drugs_and_event(store)
+        assert store.get_adverse_events(["UNKNOWN_DRUG"]) == []
+
+    def test_query_empty_list_returns_empty(self, store):
+        """get_adverse_events with empty list returns empty list."""
+        assert store.get_adverse_events([]) == []
+
+    def test_upsert_updates_junction_table(self, store):
+        """Re-upserting an event with different drug IDs refreshes junction rows."""
+        store.upsert_drug(Drug(id="DRUG_A", name="DrugA", brand_names=[]))
+        store.upsert_drug(Drug(id="DRUG_C", name="DrugC", brand_names=[]))
+        event = AdverseEvent(
+            id="EVT002",
+            drug_ids=["DRUG_A"],
+            reaction="Headache",
+            count=1,
+            seriousness="mild",
+            source_url=None,
+        )
+        store.upsert_adverse_event(event)
+
+        # Update to reference DRUG_C instead
+        updated = AdverseEvent(
+            id="EVT002",
+            drug_ids=["DRUG_C"],
+            reaction="Headache",
+            count=2,
+            seriousness="mild",
+            source_url=None,
+        )
+        store.upsert_adverse_event(updated)
+
+        conn = sqlite3.connect(store.db_path)
+        rows = conn.execute(
+            "SELECT drug_id FROM adverse_event_drugs WHERE event_id = 'EVT002'"
+        ).fetchall()
+        conn.close()
+        drug_ids = [r[0] for r in rows]
+        assert drug_ids == ["DRUG_C"]
+
+    def test_backfill_populates_junction_on_init(self, temp_db):
+        """Backfill fills junction table for pre-existing adverse_events rows."""
+        # Insert an adverse_event row directly (bypassing upsert_adverse_event)
+        # to simulate data existing before the junction table existed.
+        conn = sqlite3.connect(temp_db)
+        conn.execute("PRAGMA foreign_keys=OFF")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS adverse_events (
+                id TEXT PRIMARY KEY,
+                drug_ids TEXT NOT NULL DEFAULT '[]',
+                reaction TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 0,
+                seriousness TEXT NOT NULL DEFAULT 'unknown',
+                source_url TEXT
+            )
+        """)
+        conn.execute(
+            "INSERT INTO adverse_events VALUES (?, ?, ?, ?, ?, ?)",
+            ("EVT_OLD", json.dumps(["DRUG_X", "DRUG_Y"]), "Rash", 3, "mild", None),
+        )
+        conn.commit()
+        conn.close()
+
+        # Init store — backfill should run since junction is empty
+        store = GraphStore(temp_db)
+        conn2 = sqlite3.connect(temp_db)
+        rows = conn2.execute(
+            "SELECT drug_id FROM adverse_event_drugs WHERE event_id = 'EVT_OLD' ORDER BY drug_id"
+        ).fetchall()
+        conn2.close()
+        drug_ids = [r[0] for r in rows]
+        assert "DRUG_X" in drug_ids
+        assert "DRUG_Y" in drug_ids
+
+    def test_no_like_in_query(self, store):
+        """get_adverse_events uses JOIN not LIKE — no full table scan path."""
+        import inspect
+        source = inspect.getsource(store.get_adverse_events)
+        assert "LIKE" not in source
+        assert "JOIN" in source

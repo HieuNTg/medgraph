@@ -13,6 +13,7 @@ Cascade detection principle:
 from __future__ import annotations
 
 import logging
+import time
 from collections import deque
 from typing import Optional
 
@@ -71,19 +72,23 @@ class PathFinder:
         all_paths.extend(enzyme_cascade_paths)
 
         # For max_depth > 2, also run BFS for multi-hop paths (depth 3)
-        # Only do this when drug count is small to keep performance bounded.
-        if max_depth > 2 and len(drug_nodes) <= 5:
+        # Uses a timeout to prevent combinatorial explosion on large drug sets.
+        if max_depth > 2:
+            _bfs_deadline = time.monotonic() + 2.0
             for source_node in drug_nodes:
+                if time.monotonic() >= _bfs_deadline:
+                    break
                 target_nodes = drug_nodes - {source_node}
-                paths = self._bfs_paths(graph, source_node, target_nodes, max_depth)
+                paths = self._bfs_paths(graph, source_node, target_nodes, max_depth, _bfs_deadline)
                 all_paths.extend(paths)
 
-        # Deduplicate
-        seen: set[str] = set()
+        # Deduplicate using structured tuple key: (drug_pair, frozenset of enzyme IDs)
+        seen: set[tuple] = set()
         unique_paths: list[CascadePath] = []
         for path in all_paths:
-            key = f"{path.drug_a_name}:{path.drug_b_name}:{path.description[:60]}"
-            rev_key = f"{path.drug_b_name}:{path.drug_a_name}:{path.description[:60]}"
+            enzyme_key = frozenset(path.enzyme_ids)
+            key = (path.drug_a_name, path.drug_b_name, enzyme_key)
+            rev_key = (path.drug_b_name, path.drug_a_name, enzyme_key)
             if key not in seen and rev_key not in seen:
                 seen.add(key)
                 unique_paths.append(path)
@@ -292,11 +297,13 @@ class PathFinder:
         source: str,
         targets: set[str],
         max_depth: int,
+        deadline: float | None = None,
     ) -> list[CascadePath]:
         """
         BFS from source drug node to any target drug node, through enzyme intermediaries.
 
         Returns CascadePath objects for valid pharmacokinetic cascades.
+        Stops early if deadline (time.monotonic()) is exceeded.
         """
         # BFS state: (current_node, path_of_nodes, path_of_edges)
         queue: deque[tuple[str, list[str], list[dict]]] = deque()
@@ -306,6 +313,8 @@ class PathFinder:
         visited_states: set[tuple] = set()
 
         while queue:
+            if deadline is not None and time.monotonic() >= deadline:
+                break
             current, node_path, edge_path = queue.popleft()
 
             depth = len(node_path) - 1

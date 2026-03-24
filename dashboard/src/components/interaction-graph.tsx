@@ -300,8 +300,25 @@ export function InteractionGraph({
     return null;
   }
 
+  // Build a flat list of relationship descriptions for screen readers
+  const srRelationships = graphData.links.map((link) => {
+    const src = typeof link.source === "object" ? (link.source as GraphNode).label : link.source;
+    const tgt = typeof link.target === "object" ? (link.target as GraphNode).label : link.target;
+    return `${src} ${link.relation.replace(/_/g, " ")} ${tgt}`;
+  });
+
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+    <div
+      className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden"
+      role="application"
+      aria-label="Drug interaction network visualization"
+    >
+      {/* Hidden relationship list for screen readers */}
+      <ul className="sr-only" aria-label="Drug and enzyme relationships">
+        {srRelationships.map((rel, i) => (
+          <li key={i}>{rel}</li>
+        ))}
+      </ul>
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-4 px-4 py-2 border-b border-[var(--border)] bg-[var(--secondary)]">
         <span className="text-xs font-medium text-[var(--muted-foreground)]">
