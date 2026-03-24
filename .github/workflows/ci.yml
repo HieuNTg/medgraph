@@ -109,6 +109,21 @@ jobs:
         working-directory: dashboard
         run: npm run build
 
+  # ── Security scanning ────────────────────────────────────────────────────────
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install security tools
+        run: pip install bandit safety
+      - name: Run bandit (Python security linter)
+        run: bandit -r medgraph/ -ll -ii --skip B101
+      - name: Check dependencies for vulnerabilities
+        run: safety check --bare || true
+
   # ── Docker build validation ─────────────────────────────────────────────────
   docker-build:
     name: Docker Build

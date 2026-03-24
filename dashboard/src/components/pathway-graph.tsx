@@ -45,14 +45,14 @@ export function PathwayGraph({
   width = 600,
   height = 400,
 }: PathwayGraphProps) {
-  const { positions, nodeMap } = useMemo(() => {
+  const { nodeMap } = useMemo(() => {
     const cx = width / 2;
     const cy = height / 2;
     const radius = Math.min(cx, cy) * 0.7;
     const coords = circularLayout(data.nodes.length, cx, cy, radius);
     const map = new Map<string, { x: number; y: number }>();
     data.nodes.forEach((n, i) => map.set(n.id, coords[i]));
-    return { positions: coords, nodeMap: map };
+    return { nodeMap: map };
   }, [data.nodes, width, height]);
 
   if (data.nodes.length === 0) {

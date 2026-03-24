@@ -12,11 +12,19 @@ import hmac
 import json
 import logging
 import os
+import threading
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
 _logger = logging.getLogger(__name__)
 _DEV_SECRET = "medgraph-dev-secret"
+
+# Track failed login attempts per email: {email: (count, first_attempt_time)}
+_login_attempts: dict[str, tuple[int, float]] = {}
+_login_lock = threading.Lock()
+_MAX_LOGIN_ATTEMPTS = 5
+_LOGIN_LOCKOUT_SECONDS = 300  # 5 minutes
 
 
 def _b64url_encode(data: bytes) -> str:
@@ -36,24 +44,66 @@ class UserAuth:
 
     _HASH_ITERATIONS = 260_000  # OWASP recommended for pbkdf2_hmac/sha256
 
-    # Maps user_id -> set of valid refresh token jti values
-    _refresh_tokens: dict[str, set[str]] = {}
-
     def __init__(self, store, secret_key: str | None = None) -> None:
         self.store = store
-        resolved_secret = secret_key or os.environ.get("MEDGRAPH_JWT_SECRET", _DEV_SECRET)
-        if os.environ.get("MEDGRAPH_ENV") == "production" and resolved_secret == _DEV_SECRET:
-            raise RuntimeError(
-                "MEDGRAPH_JWT_SECRET must be set to a strong secret in production. "
-                "Do not use the default development secret."
-            )
-        if resolved_secret == _DEV_SECRET:
+        resolved_secret = secret_key or os.environ.get("MEDGRAPH_JWT_SECRET")
+        env = os.environ.get("MEDGRAPH_ENV", "development")
+
+        if not resolved_secret:
+            if env == "production":
+                raise RuntimeError(
+                    "MEDGRAPH_JWT_SECRET must be set in production. "
+                    "Do not use the default development secret."
+                )
             _logger.warning(
-                "Using default dev JWT secret. Set MEDGRAPH_JWT_SECRET for any shared environment."
+                "MEDGRAPH_JWT_SECRET not set. Using default dev secret. "
+                "Set MEDGRAPH_JWT_SECRET for any shared environment."
+            )
+            resolved_secret = _DEV_SECRET
+        elif resolved_secret == _DEV_SECRET and env == "production":
+            raise RuntimeError(
+                "MEDGRAPH_JWT_SECRET must not be the default dev secret in production."
             )
         self.secret_key = resolved_secret.encode()
         self.access_token_expiry = timedelta(minutes=15)
         self.refresh_token_expiry = timedelta(days=7)
+
+    # ------------------------------------------------------------------
+    # Brute-force protection
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _check_login_rate(email: str) -> None:
+        """Raise ValueError if too many failed attempts for this email."""
+        now = time.monotonic()
+        with _login_lock:
+            if email in _login_attempts:
+                count, first_time = _login_attempts[email]
+                if now - first_time > _LOGIN_LOCKOUT_SECONDS:
+                    del _login_attempts[email]
+                    return
+                if count >= _MAX_LOGIN_ATTEMPTS:
+                    raise ValueError("Too many login attempts. Please try again later.")
+
+    @staticmethod
+    def _record_failed_login(email: str) -> None:
+        """Record a failed login attempt."""
+        now = time.monotonic()
+        with _login_lock:
+            if email in _login_attempts:
+                count, first_time = _login_attempts[email]
+                if now - first_time > _LOGIN_LOCKOUT_SECONDS:
+                    _login_attempts[email] = (1, now)
+                else:
+                    _login_attempts[email] = (count + 1, first_time)
+            else:
+                _login_attempts[email] = (1, now)
+
+    @staticmethod
+    def _clear_failed_logins(email: str) -> None:
+        """Clear failed attempts on successful login."""
+        with _login_lock:
+            _login_attempts.pop(email, None)
 
     # ------------------------------------------------------------------
     # Password helpers
@@ -129,10 +179,12 @@ class UserAuth:
             raise ValueError("Invalid email address")
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters")
+        if len(password) > 128:
+            raise ValueError("Password must be at most 128 characters")
 
         existing = self.store.get_user_by_email(email)
         if existing:
-            raise ValueError("Email already registered")
+            raise ValueError("Registration failed. Please try again or use a different email.")
 
         user_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
@@ -152,12 +204,16 @@ class UserAuth:
     def login(self, email: str, password: str) -> dict:
         """Authenticate user and return tokens. Raises ValueError on failure."""
         email = email.strip().lower()
+        self._check_login_rate(email)
         row = self.store.get_user_by_email(email)
         if not row:
+            self._record_failed_login(email)
             raise ValueError("Invalid email or password")
         if not self._verify_password(password, row["password_hash"]):
+            self._record_failed_login(email)
             raise ValueError("Invalid email or password")
 
+        self._clear_failed_logins(email)
         now = datetime.now(timezone.utc).isoformat()
         self.store.update_user_login(row["id"], now)
         row = dict(row)
@@ -172,8 +228,7 @@ class UserAuth:
 
         user_id = payload["sub"]
         jti = payload.get("jti")
-        valid_jtis = UserAuth._refresh_tokens.get(user_id, set())
-        if jti not in valid_jtis:
+        if not jti or not self.store.is_refresh_token_valid(jti, user_id):
             raise ValueError("Refresh token has been revoked or already used")
 
         user = self.store.get_user_by_id(user_id)
@@ -181,7 +236,7 @@ class UserAuth:
             raise ValueError("User not found")
 
         # Invalidate old token before issuing new pair
-        valid_jtis.discard(jti)
+        self.store.revoke_refresh_token(jti)
         return self._build_token_response(user)
 
     def get_user(self, user_id: str) -> dict | None:
@@ -203,10 +258,11 @@ class UserAuth:
     def _build_token_response(self, user: dict) -> dict:
         access_token = self._create_token(user["id"], "access", self.access_token_expiry)
         refresh_token = self._create_token(user["id"], "refresh", self.refresh_token_expiry)
-        # Register the new refresh token's jti so it can be validated on use
+        # Register the new refresh token's jti in persistent storage
         rt_payload = self.verify_token(refresh_token)
         if rt_payload and rt_payload.get("jti"):
-            UserAuth._refresh_tokens.setdefault(user["id"], set()).add(rt_payload["jti"])
+            expires_iso = (datetime.now(timezone.utc) + self.refresh_token_expiry).isoformat()
+            self.store.store_refresh_token(rt_payload["jti"], user["id"], expires_iso)
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,

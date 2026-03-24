@@ -62,7 +62,11 @@ def _get_client_id(request: Request) -> str:
     api_key = request.headers.get("x-api-key", "")
     if api_key:
         return f"key:{hashlib.sha256(api_key.encode()).hexdigest()[:32]}"
-    client_ip = request.client.host if request.client else "unknown"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else "unknown"
     return f"ip:{client_ip}"
 
 

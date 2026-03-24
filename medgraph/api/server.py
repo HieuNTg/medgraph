@@ -34,6 +34,7 @@ Endpoints:
     POST /api/v1/optimize                               — Optimize polypharmacy regimen
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -49,6 +50,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.concurrency import run_in_threadpool
 
 from medgraph.api.audit import AuditLogger
 from medgraph.api.auth import check_rate_limit, verify_api_key
@@ -119,6 +121,7 @@ DISCLAIMER = (
 )
 
 _STATS_TTL = 3600.0  # 1 hour
+_stats_lock = asyncio.Lock()
 
 
 @asynccontextmanager
@@ -318,6 +321,9 @@ def create_app() -> FastAPI:
         return user
 
     def _client_ip(request: Request) -> str:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
     # ── Versioned API Router ──────────────────────────────────────────────
@@ -333,16 +339,23 @@ def create_app() -> FastAPI:
         if cached_result is not None and now < expiry:
             return cached_result
 
-        store: GraphStore = app.state.store
-        counts = store.get_counts()
-        result = StatsResponse(
-            drug_count=counts.get("drugs", 0),
-            interaction_count=counts.get("interactions", 0),
-            enzyme_count=counts.get("enzymes", 0),
-            adverse_event_count=counts.get("adverse_events", 0),
-        )
-        app.state.stats_cache = (result, now + _STATS_TTL)
-        return result
+        async with _stats_lock:
+            # Double-check after acquiring lock
+            cached_result, expiry = app.state.stats_cache
+            now = time.monotonic()
+            if cached_result is not None and now < expiry:
+                return cached_result
+
+            store: GraphStore = app.state.store
+            counts = await run_in_threadpool(store.get_counts)
+            result = StatsResponse(
+                drug_count=counts.get("drugs", 0),
+                interaction_count=counts.get("interactions", 0),
+                enzyme_count=counts.get("enzymes", 0),
+                adverse_event_count=counts.get("adverse_events", 0),
+            )
+            app.state.stats_cache = (result, now + _STATS_TTL)
+            return result
 
     @router.get(
         "/data/freshness",
@@ -415,7 +428,7 @@ def create_app() -> FastAPI:
     ) -> PaginatedResponse[SearchResult]:
         store: GraphStore = app.state.store
         # Single DB connection for consistent count + results
-        drugs, total = store.search_drugs_with_count(q, limit=limit, offset=offset)
+        drugs, total = await run_in_threadpool(store.search_drugs_with_count, q, limit, offset)
         items = [
             SearchResult(
                 id=drug.id,
@@ -438,10 +451,10 @@ def create_app() -> FastAPI:
     )
     async def get_drug(drug_id: str) -> DrugResponse:
         store: GraphStore = app.state.store
-        drug = store.get_drug_by_id(drug_id)
+        drug = await run_in_threadpool(store.get_drug_by_id, drug_id)
         if not drug:
             raise HTTPException(status_code=404, detail=f"Drug not found: {drug_id}")
-        return _build_drug_response(drug, store)
+        return await run_in_threadpool(_build_drug_response, drug, store)
 
     @router.get(
         "/interactions/{interaction_id}/evidence",
@@ -498,7 +511,7 @@ def create_app() -> FastAPI:
         searcher: DrugSearcher = app.state.searcher
 
         # Check DB is seeded
-        counts = store.get_counts()
+        counts = await run_in_threadpool(store.get_counts)
         if counts.get("drugs", 0) == 0:
             raise HTTPException(
                 status_code=503,
@@ -509,7 +522,7 @@ def create_app() -> FastAPI:
         found_drugs: list = []
         unresolved: list[str] = []
         for name in drug_names:
-            matches = searcher.search(name, limit=5)
+            matches = await run_in_threadpool(searcher.search, name, 5)
             if matches:
                 found_drugs.append(matches[0])
             else:
@@ -520,7 +533,9 @@ def create_app() -> FastAPI:
             suggestions: dict[str, list[str]] = {}
             for name in unresolved:
                 # broad search for suggestions
-                broad = searcher.search(name[:3], limit=5) if len(name) >= 3 else []
+                broad = (
+                    await run_in_threadpool(searcher.search, name[:3], 5) if len(name) >= 3 else []
+                )
                 suggestions[name] = [d.name for d in broad]
             raise HTTPException(
                 status_code=400,
@@ -535,7 +550,7 @@ def create_app() -> FastAPI:
 
         # Run analysis (timed for Prometheus)
         _t0 = time.perf_counter()
-        report = analyzer.analyze(drug_ids, graph, store)
+        report = await run_in_threadpool(analyzer.analyze, drug_ids, graph, store)
         ANALYSIS_DURATION.observe(time.perf_counter() - _t0)
 
         # Apply pharmacogenomics adjustments if provided
@@ -961,7 +976,9 @@ def create_app() -> FastAPI:
     # ── Auth Router ───────────────────────────────────────────────────────
     auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
-    @auth_router.post("/register", response_model=TokenResponse)
+    @auth_router.post(
+        "/register", response_model=TokenResponse, dependencies=[Depends(check_rate_limit)]
+    )
     async def register(request: Request, body: RegisterRequest) -> TokenResponse:
         user_auth: UserAuth = app.state.user_auth
         audit: AuditLogger = app.state.audit_logger
@@ -979,7 +996,9 @@ def create_app() -> FastAPI:
         )
         return TokenResponse(**result)
 
-    @auth_router.post("/login", response_model=TokenResponse)
+    @auth_router.post(
+        "/login", response_model=TokenResponse, dependencies=[Depends(check_rate_limit)]
+    )
     async def login(request: Request, body: LoginRequest) -> TokenResponse:
         user_auth: UserAuth = app.state.user_auth
         audit: AuditLogger = app.state.audit_logger
@@ -1253,7 +1272,7 @@ def create_app() -> FastAPI:
         graph = app.state.graph
         searcher: DrugSearcher = app.state.searcher
 
-        counts = store.get_counts()
+        counts = await run_in_threadpool(store.get_counts)
         if counts.get("drugs", 0) == 0:
             raise HTTPException(
                 status_code=503,
@@ -1264,7 +1283,7 @@ def create_app() -> FastAPI:
         found_drugs: list = []
         unresolved: list[str] = []
         for name in drug_names:
-            matches = searcher.search(name, limit=5)
+            matches = await run_in_threadpool(searcher.search, name, 5)
             if matches:
                 found_drugs.append(matches[0])
             else:
@@ -1279,14 +1298,14 @@ def create_app() -> FastAPI:
         # Resolve must_keep names → IDs
         must_keep_ids: list[str] = []
         for name in request.must_keep:
-            matches = searcher.search(name, limit=5)
+            matches = await run_in_threadpool(searcher.search, name, 5)
             if matches:
                 must_keep_ids.append(matches[0].id)
 
         drug_ids = [d.id for d in found_drugs]
         optimizer = PolypharmacyOptimizer(graph, store)
         try:
-            result = optimizer.optimize(drug_ids, must_keep=must_keep_ids)
+            result = await run_in_threadpool(optimizer.optimize, drug_ids, must_keep_ids)
         except Exception as exc:
             logger.exception("Optimizer engine error: %s", exc)
             raise HTTPException(status_code=503, detail="Optimizer engine failed")

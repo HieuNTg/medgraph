@@ -21,7 +21,6 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const prevQueryRef = useRef(query);
 
   // Debounce query
   useEffect(() => {
@@ -48,11 +47,8 @@ export function DrugInput({ onSubmit, loading = false }: DrugInputProps) {
 
   // Reset highlightedIndex when query changes
   useEffect(() => {
-    if (prevQueryRef.current !== query) {
-      setHighlightedIndex(-1);
-      setForceClosed(false);
-      prevQueryRef.current = query;
-    }
+    setHighlightedIndex(-1);
+    setForceClosed(false);
   }, [query]);
 
   // Close dropdown on outside click

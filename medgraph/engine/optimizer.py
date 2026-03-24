@@ -98,7 +98,8 @@ class PolypharmacyOptimizer:
 
         # --- Step 2-4: Greedy removal loop ---
         while True:
-            if self._score_regimen(current_ids) < _ACCEPTABLE_RISK_THRESHOLD:
+            current_risk = self._score_regimen(current_ids)
+            if current_risk < _ACCEPTABLE_RISK_THRESHOLD:
                 logger.info("Optimizer: risk below threshold, stopping.")
                 break
 
@@ -121,7 +122,7 @@ class PolypharmacyOptimizer:
                     reduced_risk = 0.0
                 else:
                     reduced_risk = self._score_regimen(without)
-                reduction = self._score_regimen(current_ids) - reduced_risk
+                reduction = current_risk - reduced_risk
                 if reduction > best_reduction:
                     best_reduction = reduction
                     best_drug = candidate

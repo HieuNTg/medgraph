@@ -252,7 +252,9 @@ class DataSeeder:
             for pair in FOOD_DRUG_INTERACTIONS:
                 drug_id = drug_name_to_id.get(pair["drug_name"].lower())
                 if not drug_id:
-                    logger.debug(f"Food interaction: drug '{pair['drug_name']}' not found in DB — skipping")
+                    logger.debug(
+                        f"Food interaction: drug '{pair['drug_name']}' not found in DB — skipping"
+                    )
                     continue
                 food = food_meta[pair["food_id"]]
                 row_id = f"{pair['food_id']}_{drug_id}"

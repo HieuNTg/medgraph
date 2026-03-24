@@ -43,7 +43,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "connect-src 'self'"
         )
         csp_header = (
-            "Content-Security-Policy" if self._is_production
+            "Content-Security-Policy"
+            if self._is_production
             else "Content-Security-Policy-Report-Only"
         )
         response.headers[csp_header] = csp

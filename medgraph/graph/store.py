@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator, Optional
 
@@ -48,6 +49,8 @@ class GraphStore:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA synchronous=NORMAL")
         try:
             yield conn
             conn.commit()
@@ -231,6 +234,13 @@ class GraphStore:
 
                 CREATE INDEX IF NOT EXISTS idx_food_drug ON food_interactions(drug_id);
 
+                CREATE TABLE IF NOT EXISTS refresh_tokens (
+                    jti       TEXT PRIMARY KEY,
+                    user_id   TEXT NOT NULL,
+                    expires_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+
                 -- Indexes for performance
                 CREATE INDEX IF NOT EXISTS idx_drugs_name
                     ON drugs(name);
@@ -368,9 +378,7 @@ class GraphStore:
                 ),
             )
             # Keep junction table in sync
-            conn.execute(
-                "DELETE FROM adverse_event_drugs WHERE event_id = ?", (event.id,)
-            )
+            conn.execute("DELETE FROM adverse_event_drugs WHERE event_id = ?", (event.id,))
             conn.executemany(
                 "INSERT OR IGNORE INTO adverse_event_drugs (event_id, drug_id) VALUES (?, ?)",
                 [(event.id, did) for did in event.drug_ids],
@@ -963,6 +971,37 @@ class GraphStore:
                 ).fetchone()[0],
                 "adverse_events": conn.execute("SELECT COUNT(*) FROM adverse_events").fetchone()[0],
             }
+
+    # -------------------------------------------------------------------------
+    # Refresh Tokens
+    # -------------------------------------------------------------------------
+
+    def store_refresh_token(self, jti: str, user_id: str, expires_at: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO refresh_tokens (jti, user_id, expires_at) VALUES (?, ?, ?)",
+                (jti, user_id, expires_at),
+            )
+
+    def is_refresh_token_valid(self, jti: str, user_id: str) -> bool:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT expires_at FROM refresh_tokens WHERE jti = ? AND user_id = ?",
+                (jti, user_id),
+            ).fetchone()
+        if not row:
+            return False
+        return row["expires_at"] > datetime.now(timezone.utc).isoformat()
+
+    def revoke_refresh_token(self, jti: str) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM refresh_tokens WHERE jti = ?", (jti,))
+
+    def cleanup_expired_tokens(self) -> int:
+        with self._connect() as conn:
+            now = datetime.now(timezone.utc).isoformat()
+            cursor = conn.execute("DELETE FROM refresh_tokens WHERE expires_at < ?", (now,))
+            return cursor.rowcount
 
     # -------------------------------------------------------------------------
     # Private helpers

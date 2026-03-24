@@ -5,7 +5,7 @@ FastAPI request/response models for MEDGRAPH API.
 import re
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 T = TypeVar("T")
 
@@ -275,13 +275,13 @@ class ContraindicationResponse(BaseModel):
 
 class RegisterRequest(BaseModel):
     email: str
-    password: str
+    password: str = Field(min_length=8, max_length=128)
     display_name: str | None = None
 
 
 class LoginRequest(BaseModel):
     email: str
-    password: str
+    password: str = Field(max_length=128)
 
 
 class RefreshRequest(BaseModel):

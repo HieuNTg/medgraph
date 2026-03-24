@@ -19,18 +19,11 @@ from dataclasses import dataclass
 import networkx as nx
 
 from medgraph.engine.enzyme_indexer import EnzymeIndexer
+from medgraph.engine.scorer import _SEVERITY_WEIGHTS
 from medgraph.graph.models import MEDICAL_DISCLAIMER
 from medgraph.graph.store import GraphStore
 
 logger = logging.getLogger(__name__)
-
-_SEVERITY_WEIGHTS: dict[str, float] = {
-    "critical": 90.0,
-    "major": 70.0,
-    "moderate": 40.0,
-    "minor": 15.0,
-    "none": 0.0,
-}
 
 
 @dataclass

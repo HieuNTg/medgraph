@@ -40,13 +40,13 @@ function ThemeToggle() {
 
 const STATIC_NAV_LINKS = [
   { to: "/", label: "Home", icon: null, end: true },
-  { to: "/checker", label: "Check Interactions", icon: Shield },
-  { to: "/about", label: "About", icon: Info },
+  { to: "/checker", label: "Check Interactions", icon: Shield, end: false },
+  { to: "/about", label: "About", icon: Info, end: false },
 ];
 
 const AUTH_NAV_LINKS = [
-  { to: "/profiles", label: "Profiles", icon: BookMarked },
-  { to: "/history", label: "History", icon: History },
+  { to: "/profiles", label: "Profiles", icon: BookMarked, end: false },
+  { to: "/history", label: "History", icon: History, end: false },
 ];
 
 export function AppShell() {

@@ -74,6 +74,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       );
     }
 
-    return <span key={this.state.retryKey}>{this.props.children}</span>;
+    return <div key={this.state.retryKey}>{this.props.children}</div>;
   }
 }
