@@ -238,6 +238,8 @@ class PathFinder:
                         f"{inh_name} inhibits {enzyme_id}, which is required to metabolize {sub_name}. "
                         f"Result: {sub_name} plasma levels increase, raising the risk of toxicity."
                     )
+                    inh_drug_id = inh_node.replace("drug:", "")
+                    sub_drug_id = sub_node.replace("drug:", "")
                     paths.append(
                         CascadePath(
                             steps=[step1, step2],
@@ -245,6 +247,8 @@ class PathFinder:
                             description=desc,
                             drug_a_name=inh_name,
                             drug_b_name=sub_name,
+                            drug_a_id=inh_drug_id,
+                            drug_b_id=sub_drug_id,
                             enzyme_ids=[enzyme_id],
                         )
                     )
@@ -278,6 +282,8 @@ class PathFinder:
                         f"{ind_name} induces {enzyme_id}, accelerating {sub_name} metabolism. "
                         f"Result: {sub_name} plasma levels decrease, potentially reducing efficacy."
                     )
+                    ind_drug_id = ind_node.replace("drug:", "")
+                    sub_drug_id = sub_node.replace("drug:", "")
                     paths.append(
                         CascadePath(
                             steps=[step1, step2],
@@ -285,6 +291,8 @@ class PathFinder:
                             description=desc,
                             drug_a_name=ind_name,
                             drug_b_name=sub_name,
+                            drug_a_id=ind_drug_id,
+                            drug_b_id=sub_drug_id,
                             enzyme_ids=[enzyme_id],
                         )
                     )
@@ -453,12 +461,16 @@ class PathFinder:
         # Build description
         description = self._describe_cascade(drug_a_name, drug_b_name, steps, enzyme_ids)
 
+        drug_a_id = drug_a_node.replace("drug:", "")
+        drug_b_id = drug_b_node.replace("drug:", "")
         return CascadePath(
             steps=steps,
             net_severity=severity,
             description=description,
             drug_a_name=drug_a_name,
             drug_b_name=drug_b_name,
+            drug_a_id=drug_a_id,
+            drug_b_id=drug_b_id,
             enzyme_ids=enzyme_ids,
         )
 

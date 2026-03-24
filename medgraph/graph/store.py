@@ -39,11 +39,12 @@ class GraphStore:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.init_db()
+        self._migrate_add_is_admin()
         self._ensure_schema_metadata()
         self._backfill_adverse_event_drugs()
 
     @contextmanager
-    def _connect(self) -> Generator[sqlite3.Connection, None, None]:
+    def connect(self) -> Generator[sqlite3.Connection, None, None]:
         """Context manager providing a SQLite connection with row_factory set."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -60,6 +61,9 @@ class GraphStore:
         finally:
             conn.close()
 
+    # Backward-compatible alias
+    _connect = connect
+
     def init_db(self) -> None:
         """Create all tables and indexes if they don't exist.
 
@@ -74,6 +78,7 @@ class GraphStore:
                     email         TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
                     display_name  TEXT,
+                    is_admin      INTEGER NOT NULL DEFAULT 0,
                     created_at    TEXT NOT NULL,
                     last_login    TEXT
                 );
@@ -264,7 +269,27 @@ class GraphStore:
                 CREATE INDEX IF NOT EXISTS idx_food_interactions_drug_id ON food_interactions(drug_id);
                 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_jti ON refresh_tokens(jti);
                 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+
+                CREATE TABLE IF NOT EXISTS refresh_metadata (
+                    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source         TEXT NOT NULL,
+                    last_refresh   TEXT NOT NULL,
+                    records_updated INTEGER NOT NULL DEFAULT 0,
+                    status         TEXT NOT NULL DEFAULT 'completed',
+                    created_at     TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_refresh_metadata_source ON refresh_metadata(source);
+                CREATE INDEX IF NOT EXISTS idx_refresh_metadata_created ON refresh_metadata(created_at DESC);
             """)
+
+    def _migrate_add_is_admin(self) -> None:
+        """Add is_admin column to existing users table if missing."""
+        with self._connect() as conn:
+            columns = [
+                row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()
+            ]
+            if "is_admin" not in columns:
+                conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
 
     # -------------------------------------------------------------------------
     # Upsert methods
@@ -613,6 +638,24 @@ class GraphStore:
             ).fetchall()
         return [GeneticGuideline(**dict(r)) for r in rows]
 
+    def get_guidelines_for_drugs(self, drug_ids: list[str]) -> list[GeneticGuideline]:
+        """Batch lookup: return all genetic guidelines for a list of drug IDs."""
+        if not drug_ids:
+            return []
+        placeholders = ",".join("?" * len(drug_ids))
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM genetic_guidelines WHERE drug_id IN ({placeholders})",
+                drug_ids,
+            ).fetchall()
+        return [GeneticGuideline(**dict(r)) for r in rows]
+
+    def get_all_guidelines(self) -> list[GeneticGuideline]:
+        """Return every genetic guideline row (used for in-memory caching)."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM genetic_guidelines").fetchall()
+        return [GeneticGuideline(**dict(r)) for r in rows]
+
     def get_evidence_sources(self, interaction_id: str) -> list[EvidenceSource]:
         with self._connect() as conn:
             rows = conn.execute(
@@ -880,6 +923,53 @@ class GraphStore:
                 )
             """)
 
+    # -------------------------------------------------------------------------
+    # Refresh metadata (FAERS pipeline)
+    # -------------------------------------------------------------------------
+
+    def save_refresh_metadata(
+        self, source: str, records_updated: int, status: str
+    ) -> None:
+        """Insert a refresh run record into refresh_metadata."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO refresh_metadata (source, last_refresh, records_updated, status, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (source, now, records_updated, status, now),
+            )
+
+    def get_last_refresh(self, source: str) -> Optional[dict]:
+        """Return the most recent refresh record for a source, or None."""
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, source, last_refresh, records_updated, status, created_at
+                FROM refresh_metadata
+                WHERE source = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (source,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def get_refresh_history(self, limit: int = 20) -> list[dict]:
+        """Return recent refresh records across all sources, newest first."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, source, last_refresh, records_updated, status, created_at
+                FROM refresh_metadata
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
     def get_schema_version(self) -> str:
         """Return the current schema version string."""
         with self._connect() as conn:
@@ -998,78 +1088,9 @@ class GraphStore:
         }
 
     # -------------------------------------------------------------------------
-    # Evidence Sources (PubMed agent)
+    # Note: upsert_evidence_source and get_evidence_sources are defined above
+    # (lines ~393 and ~616) using proper EvidenceSource model objects.
     # -------------------------------------------------------------------------
-
-    def upsert_evidence_source(
-        self,
-        interaction_id: str,
-        source_type: str,
-        source_id: str,
-        title: str,
-        url: str,
-        relevance_score: float,
-    ) -> None:
-        """Insert or update an evidence source for a drug interaction."""
-        with self._connect() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS evidence_sources (
-                    id               TEXT PRIMARY KEY,
-                    interaction_id   TEXT NOT NULL,
-                    source_type      TEXT NOT NULL,
-                    source_id        TEXT NOT NULL,
-                    title            TEXT NOT NULL,
-                    url              TEXT NOT NULL,
-                    relevance_score  REAL NOT NULL,
-                    created_at       TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_evidence_interaction ON evidence_sources(interaction_id)"
-            )
-            import uuid as _uuid
-            from datetime import datetime, timezone
-            now = datetime.now(timezone.utc).isoformat()
-            # Composite key: interaction_id + source_type + source_id
-            record_id = f"{interaction_id}:{source_type}:{source_id}"
-            conn.execute(
-                """
-                INSERT INTO evidence_sources
-                    (id, interaction_id, source_type, source_id, title, url, relevance_score, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    title           = excluded.title,
-                    url             = excluded.url,
-                    relevance_score = excluded.relevance_score
-                """,
-                (record_id, interaction_id, source_type, source_id, title, url, relevance_score, now),
-            )
-
-    def get_evidence_sources(self, interaction_id: str) -> list[dict]:
-        """Return all evidence sources for a given interaction ID."""
-        with self._connect() as conn:
-            # Table may not exist yet if upsert was never called
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS evidence_sources (
-                    id               TEXT PRIMARY KEY,
-                    interaction_id   TEXT NOT NULL,
-                    source_type      TEXT NOT NULL,
-                    source_id        TEXT NOT NULL,
-                    title            TEXT NOT NULL,
-                    url              TEXT NOT NULL,
-                    relevance_score  REAL NOT NULL,
-                    created_at       TEXT NOT NULL
-                )
-                """
-            )
-            rows = conn.execute(
-                "SELECT * FROM evidence_sources WHERE interaction_id = ? ORDER BY relevance_score DESC",
-                (interaction_id,),
-            ).fetchall()
-        return [dict(r) for r in rows]
 
     # -------------------------------------------------------------------------
     # Refresh Tokens

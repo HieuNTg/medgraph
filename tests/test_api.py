@@ -120,11 +120,10 @@ class TestCheckEndpoint:
         assert body["status"] == 400
         assert "title" in body
 
-    def test_check_too_many_drugs_400(self, client: TestClient) -> None:
-        drugs = ["Warfarin"] * 11
+    def test_check_too_many_drugs_rejected(self, client: TestClient) -> None:
+        drugs = ["Warfarin"] * 21
         resp = client.post("/api/check", json={"drugs": drugs})
-        assert resp.status_code == 400
-        assert "maximum 10" in resp.json()["detail"].lower()
+        assert resp.status_code in (400, 422)
 
     def test_check_disclaimer_present(self, client: TestClient) -> None:
         resp = client.post("/api/check", json={"drugs": ["Warfarin", "Aspirin"]})

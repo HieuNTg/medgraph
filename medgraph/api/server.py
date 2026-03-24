@@ -33,6 +33,10 @@ Endpoints:
     GET  /api/v1/audit                                  — Audit log (admin)
 
     POST /api/v1/optimize                               — Optimize polypharmacy regimen
+
+    POST /api/v1/admin/refresh                          — Trigger manual FAERS refresh (admin)
+    GET  /api/v1/admin/refresh/jobs                     — View refresh job history (admin)
+    GET  /api/v1/health/freshness                       — Data freshness check (public)
 """
 
 import asyncio
@@ -54,7 +58,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.concurrency import run_in_threadpool
 
 from medgraph.api.audit import AuditLogger
-from medgraph.api.auth import check_rate_limit, verify_api_key
+from medgraph.api.auth import _is_trusted_proxy, check_rate_limit, verify_api_key
 from medgraph.api.user_auth import UserAuth
 from medgraph.api.errors import register_error_handlers
 from medgraph.api.metrics import ANALYSIS_DURATION, GRAPH_EDGES, GRAPH_NODES, setup_metrics
@@ -98,6 +102,11 @@ from medgraph.api.models import (
     PathwayResponse,
     PDFReportRequest,
     PGxAnnotation,
+    PGxCheckRequest,
+    PGxCheckResponse,
+    PGxAdjustment,
+    PGxInteractionResponse,
+    PGxSummary,
     PGxDrugAlert,
     PGxRiskRequest,
     PGxRiskResponse,
@@ -112,6 +121,7 @@ from medgraph.api.models import (
     UserResponse,
 )
 from medgraph.api.search import DrugSearcher
+from medgraph.data.refresh_service import RefreshService
 from medgraph.engine.analyzer import CascadeAnalyzer
 from medgraph.engine.explainer import explain_interaction, explain_report
 from medgraph.engine.optimizer import PolypharmacyOptimizer
@@ -147,7 +157,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     analyzer = CascadeAnalyzer()
     searcher = DrugSearcher(store, use_rxnorm=False)
 
-    secret_key = os.environ.get("MEDGRAPH_JWT_SECRET", "medgraph-dev-secret")
+    # Let UserAuth handle fallback and production guard (no default here)
+    secret_key = os.environ.get("MEDGRAPH_JWT_SECRET") or None
+    env = os.environ.get("MEDGRAPH_ENV", "development")
+    if env == "production" and not os.environ.get("MEDGRAPH_API_KEYS", "").strip():
+        logger.warning(
+            "SECURITY WARNING: Running in production without MEDGRAPH_API_KEYS. "
+            "API is unauthenticated. Set MEDGRAPH_API_KEYS to enable auth."
+        )
     user_auth = UserAuth(store, secret_key=secret_key)
     audit_logger = AuditLogger(store)
 
@@ -159,6 +176,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.user_auth = user_auth
     app.state.audit_logger = audit_logger
     app.state.enzymes = {e.id: e for e in store.get_all_enzymes()}
+    app.state.refresh_service = RefreshService(store)
+
+    # PGxScorer singleton — avoids per-request instantiation (cache preserved)
+    try:
+        from medgraph.engine.pgx_scorer import PGxScorer
+        app.state.pgx_scorer = PGxScorer(store)
+    except ImportError:
+        app.state.pgx_scorer = None
 
     counts = store.get_counts()
     # Set Prometheus gauges
@@ -223,11 +248,23 @@ def _init_sentry() -> None:
             logger.warning("Invalid SENTRY_TRACES_RATE, falling back to 0.1")
             traces_rate = 0.1
 
+        def _sentry_before_send(event, hint):
+            """Scrub PGx phenotype data from Sentry error reports."""
+            if "exception" in event:
+                for exc_info in event["exception"].get("values", []):
+                    for frame in exc_info.get("stacktrace", {}).get("frames", []):
+                        variables = frame.get("vars", {})
+                        for key in list(variables.keys()):
+                            if key in ("phenotypes", "metabolizer_phenotypes", "phenotype"):
+                                variables[key] = "[REDACTED]"
+            return event
+
         sentry_sdk.init(
             dsn=dsn,
             traces_sample_rate=traces_rate,
             integrations=[FastApiIntegration()],
             environment=os.environ.get("MEDGRAPH_ENV", "development"),
+            before_send=_sentry_before_send,
         )
         logger.info("Sentry error tracking initialized")
     except ImportError:
@@ -329,10 +366,12 @@ def create_app() -> FastAPI:
         return user
 
     def _client_ip(request: Request) -> str:
+        """Extract client IP with trusted-proxy validation."""
+        direct_ip = request.client.host if request.client else "unknown"
         forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
+        if forwarded and _is_trusted_proxy(direct_ip):
             return forwarded.split(",")[0].strip()
-        return request.client.host if request.client else "unknown"
+        return direct_ip
 
     # ── Versioned API Router ──────────────────────────────────────────────
     # All endpoints live on an APIRouter, mounted at both /api/v1 (canonical)
@@ -510,21 +549,23 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail="No drugs provided")
         if len(drug_names) == 1:
             raise HTTPException(status_code=400, detail="minimum 2 drugs required")
-        if len(drug_names) > 10:
-            raise HTTPException(status_code=400, detail="maximum 10 drugs")
+        if len(drug_names) > 20:
+            raise HTTPException(status_code=400, detail="maximum 20 drugs")
 
         store: GraphStore = app.state.store
         graph = app.state.graph
         analyzer: CascadeAnalyzer = app.state.analyzer
         searcher: DrugSearcher = app.state.searcher
 
-        # Check DB is seeded
-        counts = await run_in_threadpool(store.get_counts)
-        if counts.get("drugs", 0) == 0:
-            raise HTTPException(
-                status_code=503,
-                detail="Database not seeded. Run 'python -m medgraph.cli seed' first.",
-            )
+        # Check DB is seeded (uses startup-cached counts when available)
+        if app.state.stats_cache[0] is not None:
+            cached_stats = app.state.stats_cache[0]
+            if cached_stats.drug_count == 0:
+                raise HTTPException(status_code=503, detail="Database not seeded")
+        else:
+            counts = await run_in_threadpool(store.get_counts)
+            if counts.get("drugs", 0) == 0:
+                raise HTTPException(status_code=503, detail="Database not seeded")
 
         # Resolve drug names → Drug objects
         found_drugs: list = []
@@ -659,7 +700,7 @@ def create_app() -> FastAPI:
             )
 
         # Fetch food interactions for all resolved drugs
-        food_rows = store.get_food_interactions(drug_ids)
+        food_rows = await run_in_threadpool(store.get_food_interactions, drug_ids)
         food_interactions_resp = [
             FoodInteractionResponse(
                 food_name=r["food_name"],
@@ -698,7 +739,7 @@ def create_app() -> FastAPI:
                 created_at=check_response.timestamp,
             )
         except Exception:
-            pass  # History save must not break primary analysis
+            logger.warning("Auto-save analysis history failed", exc_info=True)
 
         return check_response
 
@@ -860,6 +901,198 @@ def create_app() -> FastAPI:
             ),
         )
 
+    @router.post(
+        "/check-pgx",
+        response_model=PGxCheckResponse,
+        tags=["pharmacogenomics"],
+        dependencies=_api_deps,
+    )
+    async def check_pgx(
+        request: PGxCheckRequest,
+        http_request: Request,
+    ) -> PGxCheckResponse:
+        """
+        Analyze drug interactions adjusted for patient pharmacogenomics.
+
+        Accepts drug names + metabolizer phenotypes; returns full interaction
+        report with PGx-adjusted risk scores and CPIC-based recommendations.
+        No patient genetic data is stored — phenotypes are processed in-memory only.
+        """
+        from medgraph.engine.pgx_scorer import PGxScorer
+
+        store: GraphStore = app.state.store
+        graph = app.state.graph
+        analyzer: CascadeAnalyzer = app.state.analyzer
+        searcher: DrugSearcher = app.state.searcher
+
+        # Resolve drug names to Drug objects
+        found_drugs = []
+        unresolved: list[str] = []
+        for name in request.drugs:
+            matches = await run_in_threadpool(searcher.search, name, 5)
+            if matches:
+                found_drugs.append(matches[0])
+            else:
+                unresolved.append(name)
+
+        if unresolved:
+            suggestions: dict[str, list[str]] = {}
+            for name in unresolved:
+                broad = (
+                    await run_in_threadpool(searcher.search, name[:3], 5)
+                    if len(name) >= 3
+                    else []
+                )
+                suggestions[name] = [d.name for d in broad]
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Some drugs were not found",
+                    "unresolved": unresolved,
+                    "suggestions": suggestions,
+                },
+            )
+
+        drug_ids = [d.id for d in found_drugs]
+
+        # Run base interaction analysis
+        report = await run_in_threadpool(analyzer.analyze, drug_ids, graph, store)
+
+        # Build enzyme lookup (use startup cache when available)
+        try:
+            enzymes_by_id = http_request.app.state.enzymes
+        except AttributeError:
+            enzymes_by_id = {e.id: e for e in store.get_all_enzymes()}
+
+        # PGx scorer — stateless, phenotypes never stored
+        pgx_scorer = app.state.pgx_scorer or PGxScorer(store)
+        phenotypes: dict[str, str] = request.phenotypes or {}
+
+        pgx_interactions: list[PGxInteractionResponse] = []
+
+        for result in report.interactions:
+            base_score = result.risk_score
+            base_severity = result.severity
+            description = ""
+            mechanism = None
+            if result.direct_interaction:
+                description = result.direct_interaction.description
+                mechanism = result.direct_interaction.mechanism
+
+            adj_score, adj_severity, adjustments = pgx_scorer.adjust_interaction_score(
+                drug_a_id=result.drug_a.id,
+                drug_a_name=result.drug_a.name,
+                drug_b_id=result.drug_b.id,
+                drug_b_name=result.drug_b.name,
+                base_score=base_score,
+                base_severity=base_severity,
+                phenotypes=phenotypes,
+            )
+
+            pgx_confidence = pgx_scorer.compute_pgx_confidence(adjustments, phenotypes)
+            recommendations = pgx_scorer.build_recommendations(adjustments)
+
+            cascade_paths_resp: list[CascadePathResponse] = []
+            for cp in result.cascade_paths:
+                steps_resp = [
+                    CascadeStepResponse(
+                        source=step.source_drug,
+                        target=step.target,
+                        relation=step.relation,
+                        effect=step.effect,
+                    )
+                    for step in cp.steps
+                ]
+                cascade_paths_resp.append(
+                    CascadePathResponse(
+                        steps=steps_resp,
+                        description=cp.description,
+                        net_severity=cp.net_severity,
+                    )
+                )
+
+            evidence_resp: list[EvidenceResponse] = []
+            for ev in result.evidence:
+                evidence_resp.append(
+                    EvidenceResponse(
+                        source=ev.source,
+                        description=ev.description,
+                        case_count=ev.evidence_count if ev.evidence_count > 0 else None,
+                        url=ev.url,
+                    )
+                )
+
+            pgx_interactions.append(
+                PGxInteractionResponse(
+                    drug_a=_build_drug_response(result.drug_a, store, enzymes_by_id),
+                    drug_b=_build_drug_response(result.drug_b, store, enzymes_by_id),
+                    base_severity=base_severity,
+                    base_risk_score=round(base_score, 2),
+                    adjusted_severity=adj_severity,
+                    adjusted_risk_score=round(adj_score, 2),
+                    description=description,
+                    mechanism=mechanism,
+                    pgx_adjustments=[
+                        PGxAdjustment(
+                            drug_name=a.drug_name,
+                            gene=a.gene,
+                            phenotype=a.phenotype,
+                            severity_multiplier=a.severity_multiplier,
+                            reason=a.reason,
+                        )
+                        for a in adjustments
+                    ],
+                    recommendations=recommendations,
+                    pgx_confidence=pgx_confidence,
+                    cascade_paths=cascade_paths_resp,
+                    evidence=evidence_resp,
+                )
+            )
+
+        adjusted_scores = [i.adjusted_risk_score for i in pgx_interactions]
+        overall_adjusted_score = max(adjusted_scores) if adjusted_scores else 0.0
+        overall_adjusted_risk = analyzer.scorer.classify_severity(overall_adjusted_score)
+
+        food_rows = store.get_food_interactions(drug_ids)
+        food_interactions_resp = [
+            FoodInteractionResponse(
+                food_name=r["food_name"],
+                food_category=r["food_category"],
+                drug_id=r["drug_id"],
+                severity=r["severity"],
+                description=r["description"],
+                mechanism=r.get("mechanism"),
+                evidence_level=r.get("evidence_level", "C"),
+            )
+            for r in food_rows
+        ]
+
+        drugs_response = [_build_drug_response(d, store, enzymes_by_id) for d in report.drugs]
+        actionable = sum(1 for i in pgx_interactions if i.pgx_adjustments)
+        confidence = 0.98 if actionable > 0 else 0.5 if phenotypes else 0.0
+
+        return PGxCheckResponse(
+            drugs=drugs_response,
+            interactions=pgx_interactions,
+            overall_risk=overall_adjusted_risk,
+            overall_score=round(overall_adjusted_score, 2),
+            drug_count=len(report.drugs),
+            interaction_count=len(pgx_interactions),
+            pgx_summary=PGxSummary(
+                genes_tested=sorted(phenotypes.keys()),
+                actionable_findings=actionable,
+                confidence=confidence,
+            ),
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            disclaimer=(
+                "Pharmacogenomics data is for informational and research purposes only. "
+                "It does not constitute medical advice. Clinical genetic testing and "
+                "consultation with a qualified healthcare professional or clinical "
+                "pharmacist is required before making any medication decisions."
+            ),
+            food_interactions=food_interactions_resp,
+        )
+
     # ── Graph & Advanced Analysis Endpoints ──────────────────────────────────
     # Engine modules are provided by another agent; import with graceful fallback.
 
@@ -942,12 +1175,15 @@ def create_app() -> FastAPI:
 
         enzymes_by_id = app.state.enzymes
 
+        # Batch-load drugs and enzyme relations (avoids N+1 queries)
+        drug_batch = await run_in_threadpool(store.get_drugs_by_ids, drug_ids)
         for drug_id in drug_ids:
-            drug = store.get_drug_by_id(drug_id)
+            drug = drug_batch.get(drug_id)
             if not drug:
                 continue
             nodes[drug_id] = PathwayNode(id=drug_id, type="drug", label=drug.name)
-            for rel in store.get_enzyme_relations(drug_id):
+            rels = await run_in_threadpool(store.get_enzyme_relations, drug_id)
+            for rel in rels:
                 enz_id = rel.enzyme_id
                 if enz_id not in nodes:
                     enz_label = enzymes_by_id[enz_id].name if enz_id in enzymes_by_id else enz_id
@@ -964,7 +1200,7 @@ def create_app() -> FastAPI:
         # Collect cascade interactions between the supplied drugs
         if len(drug_ids) >= 2:
             cascade_analyzer: CascadeAnalyzer = app.state.analyzer
-            report = cascade_analyzer.analyze(drug_ids, graph, store)
+            report = await run_in_threadpool(cascade_analyzer.analyze, drug_ids, graph, store)
             for interaction in report.interactions:
                 for cp in interaction.cascade_paths:
                     cascades.append(
@@ -1123,7 +1359,9 @@ def create_app() -> FastAPI:
         )
         return TokenResponse(**result)
 
-    @auth_router.post("/refresh", response_model=TokenResponse)
+    @auth_router.post(
+        "/refresh", response_model=TokenResponse, dependencies=[Depends(check_rate_limit)]
+    )
     async def refresh_token(body: RefreshRequest) -> TokenResponse:
         user_auth: UserAuth = app.state.user_auth
         try:
@@ -1166,7 +1404,8 @@ def create_app() -> FastAPI:
         audit: AuditLogger = app.state.audit_logger
         now = datetime.now(timezone.utc).isoformat()
         profile_id = str(uuid.uuid4())
-        store.create_profile(
+        await run_in_threadpool(
+            store.create_profile,
             profile_id=profile_id,
             user_id=user["id"],
             name=body.name,
@@ -1198,7 +1437,7 @@ def create_app() -> FastAPI:
         user: dict = Depends(require_current_user),
     ) -> list[ProfileResponse]:
         store: GraphStore = app.state.store
-        rows = store.get_profiles_by_user(user["id"])
+        rows = await run_in_threadpool(store.get_profiles_by_user, user["id"])
         return [ProfileResponse(**r) for r in rows]
 
     @router.get(
@@ -1212,7 +1451,7 @@ def create_app() -> FastAPI:
         user: dict = Depends(require_current_user),
     ) -> ProfileResponse:
         store: GraphStore = app.state.store
-        row = store.get_profile_by_id(profile_id)
+        row = await run_in_threadpool(store.get_profile_by_id, profile_id)
         if not row:
             raise HTTPException(status_code=404, detail="Profile not found")
         if row["user_id"] != user["id"]:
@@ -1233,13 +1472,14 @@ def create_app() -> FastAPI:
     ) -> ProfileResponse:
         store: GraphStore = app.state.store
         audit: AuditLogger = app.state.audit_logger
-        row = store.get_profile_by_id(profile_id)
+        row = await run_in_threadpool(store.get_profile_by_id, profile_id)
         if not row:
             raise HTTPException(status_code=404, detail="Profile not found")
         if row["user_id"] != user["id"]:
             raise HTTPException(status_code=403, detail="Access denied")
         now = datetime.now(timezone.utc).isoformat()
-        store.update_profile(
+        await run_in_threadpool(
+            store.update_profile,
             profile_id=profile_id,
             name=body.name,
             drug_ids=body.drug_ids,
@@ -1270,12 +1510,12 @@ def create_app() -> FastAPI:
     ) -> dict:
         store: GraphStore = app.state.store
         audit: AuditLogger = app.state.audit_logger
-        row = store.get_profile_by_id(profile_id)
+        row = await run_in_threadpool(store.get_profile_by_id, profile_id)
         if not row:
             raise HTTPException(status_code=404, detail="Profile not found")
         if row["user_id"] != user["id"]:
             raise HTTPException(status_code=403, detail="Access denied")
-        store.delete_profile(profile_id)
+        await run_in_threadpool(store.delete_profile, profile_id)
         audit.log(
             "profile.delete",
             user_id=user["id"],
@@ -1299,7 +1539,7 @@ def create_app() -> FastAPI:
         user: dict = Depends(require_current_user),
     ) -> list[AnalysisHistoryResponse]:
         store: GraphStore = app.state.store
-        rows = store.get_history_by_user(user["id"], limit=limit, offset=offset)
+        rows = await run_in_threadpool(store.get_history_by_user, user["id"], limit, offset)
         return [
             AnalysisHistoryResponse(
                 id=r["id"],
@@ -1322,7 +1562,7 @@ def create_app() -> FastAPI:
         user: dict | None = Depends(get_current_user),
     ) -> SharedResultResponse:
         store: GraphStore = app.state.store
-        row = store.get_analysis_by_id(analysis_id)
+        row = await run_in_threadpool(store.get_analysis_by_id, analysis_id)
         if not row:
             raise HTTPException(status_code=404, detail="Analysis not found")
         if row.get("user_id") and (user is None or row["user_id"] != user["id"]):
@@ -1330,7 +1570,8 @@ def create_app() -> FastAPI:
         share_id = secrets.token_urlsafe(32)
         now = datetime.now(timezone.utc)
         expires_at = (now + timedelta(days=expires_days)).isoformat()
-        store.create_shared_result(
+        await run_in_threadpool(
+            store.create_shared_result,
             share_id=share_id,
             analysis_id=analysis_id,
             expires_at=expires_at,
@@ -1347,13 +1588,13 @@ def create_app() -> FastAPI:
     async def get_shared(token: str) -> dict:
         """Retrieve a shared analysis result. No authentication required."""
         store: GraphStore = app.state.store
-        share = store.get_shared_result(token)
+        share = await run_in_threadpool(store.get_shared_result, token)
         if not share:
             raise HTTPException(status_code=404, detail="Shared result not found")
         if share.get("expires_at"):
             if share["expires_at"] < datetime.now(timezone.utc).isoformat():
                 raise HTTPException(status_code=410, detail="Shared result has expired")
-        analysis = store.get_analysis_by_id(share["analysis_id"])
+        analysis = await run_in_threadpool(store.get_analysis_by_id, share["analysis_id"])
         if not analysis:
             raise HTTPException(status_code=404, detail="Analysis data not found")
         return {
@@ -1519,9 +1760,14 @@ def create_app() -> FastAPI:
         offset: int = Query(0, ge=0),
         _user: dict = Depends(require_current_user),
     ) -> list[AuditLogResponse]:
-        """Return audit log entries. Requires authentication."""
+        """Return audit log entries. Non-admin users can only see their own logs."""
+        # Restrict non-admin users to their own audit logs
+        if not _user.get("is_admin", False):
+            user_id = _user.get("id")
         store: GraphStore = app.state.store
-        rows = store.get_audit_logs(user_id=user_id, action=action, limit=limit, offset=offset)
+        rows = await run_in_threadpool(
+            store.get_audit_logs, user_id=user_id, action=action, limit=limit, offset=offset
+        )
         return [
             AuditLogResponse(
                 id=r["id"],
@@ -1532,6 +1778,70 @@ def create_app() -> FastAPI:
             )
             for r in rows
         ]
+
+    # ── Admin Refresh Endpoints ───────────────────────────────────────────
+
+    @router.post(
+        "/admin/refresh",
+        tags=["admin"],
+        dependencies=_api_deps,
+        summary="Trigger a manual FAERS data refresh (admin only)",
+    )
+    async def admin_trigger_refresh(
+        sources: list[str] | None = None,
+        force: bool = False,
+        _user: dict = Depends(require_current_user),
+    ) -> dict:
+        """
+        Trigger an incremental FAERS refresh.
+
+        Requires authenticated user with is_admin=True.
+        Returns the completed job record (runs synchronously in request).
+        """
+        if not _user.get("is_admin", False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        svc: RefreshService = app.state.refresh_service
+        job = await svc.trigger_refresh(sources=sources, force=force)
+        return {
+            "job_id": job.job_id,
+            "status": job.status,
+            "sources_attempted": job.sources_attempted,
+            "sources_succeeded": job.sources_succeeded,
+            "sources_failed": job.sources_failed,
+            "records_updated": job.records_updated,
+            "timestamp": job.timestamp,
+            "errors": job.errors,
+        }
+
+    @router.get(
+        "/admin/refresh/jobs",
+        tags=["admin"],
+        dependencies=_api_deps,
+        summary="View FAERS refresh job history",
+    )
+    async def admin_refresh_jobs(
+        limit: int = Query(20, ge=1, le=100),
+        _user: dict = Depends(require_current_user),
+    ) -> list[dict]:
+        """Return recent refresh job history. Admin only."""
+        if not _user.get("is_admin", False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        svc: RefreshService = app.state.refresh_service
+        # Prefer in-memory (current session) over DB
+        memory_history = svc.get_job_history(limit=limit)
+        if memory_history:
+            return memory_history
+        return app.state.store.get_refresh_history(limit=limit)
+
+    @router.get(
+        "/health/freshness",
+        tags=["system"],
+        summary="Data freshness check (public)",
+    )
+    async def health_freshness() -> dict:
+        """Return current FAERS data freshness status. No authentication required."""
+        svc: RefreshService = app.state.refresh_service
+        return svc.get_freshness(source="openfda")
 
     # Mount router at /api/v1 (canonical) and /api (backward compat)
     app.include_router(router, prefix="/api/v1")
@@ -1614,7 +1924,7 @@ def create_app() -> FastAPI:
                 )
 
             _t0 = time.perf_counter()
-            report = analyzer.analyze(drug_ids, graph, store)
+            report = await run_in_threadpool(analyzer.analyze, drug_ids, graph, store)
             ANALYSIS_DURATION.observe(time.perf_counter() - _t0)
 
             enzymes_by_id = app.state.enzymes

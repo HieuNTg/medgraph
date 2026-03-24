@@ -53,6 +53,8 @@ class CascadePath(BaseModel):
     description: str  # Human-readable explanation of the full cascade
     drug_a_name: str
     drug_b_name: str
+    drug_a_id: str = ""  # Drug ID for reliable matching (not name-based)
+    drug_b_id: str = ""  # Drug ID for reliable matching (not name-based)
     enzyme_ids: list[str] = Field(default_factory=list)  # Enzymes involved
 
 

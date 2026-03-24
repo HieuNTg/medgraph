@@ -54,5 +54,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')"
 
-# Seed DB (if not already seeded via volume) then start server
-CMD ["sh", "-c", "python -m medgraph.cli seed 2>/dev/null; uvicorn medgraph.api.server:app --host 0.0.0.0 --port 8000 --workers 2"]
+# Run migrations, seed DB (if not already seeded via volume), then start server
+# NOTE: --workers 1 because rate limiter and token blacklist use in-memory state
+CMD ["sh", "-c", "python -m medgraph.cli db upgrade 2>/dev/null || true; python -m medgraph.cli seed 2>/dev/null || true; uvicorn medgraph.api.server:app --host 0.0.0.0 --port 8000 --workers 1"]

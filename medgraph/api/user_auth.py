@@ -293,6 +293,7 @@ class UserAuth:
             "id": row["id"],
             "email": row["email"],
             "display_name": row["display_name"],
+            "is_admin": bool(row.get("is_admin", 0)),
             "created_at": row["created_at"],
         }
 

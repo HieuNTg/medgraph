@@ -191,17 +191,16 @@ class CascadeAnalyzer:
         # Direct interaction from lookup
         direct = interaction_lookup.get(frozenset([drug_a.id, drug_b.id]))
 
-        # Filter cascade paths for this pair
+        # Filter cascade paths for this pair using drug IDs (reliable matching)
+        pair_ids = {drug_a.id, drug_b.id}
         pair_cascades = [
             p
             for p in all_cascade_paths
-            if (
-                p.drug_a_name.lower() == drug_a.name.lower()
-                and p.drug_b_name.lower() == drug_b.name.lower()
-            )
+            if (p.drug_a_id and p.drug_b_id and {p.drug_a_id, p.drug_b_id} == pair_ids)
             or (
-                p.drug_a_name.lower() == drug_b.name.lower()
-                and p.drug_b_name.lower() == drug_a.name.lower()
+                not p.drug_a_id
+                and {p.drug_a_name.lower(), p.drug_b_name.lower()}
+                == {drug_a.name.lower(), drug_b.name.lower()}
             )
         ]
 
