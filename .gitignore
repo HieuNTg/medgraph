@@ -94,3 +94,16 @@ htmlcov/
 
 # MEDGRAPH database
 data/*.db
+
+# Coverage reports
+coverage.json
+
+# Understand-anything knowledge graphs
+.understand-anything/
+
+# Root-level package manager (project uses dashboard/package.json)
+/package.json
+/package-lock.json
+
+# Pytest cache
+.pytest_cache/
