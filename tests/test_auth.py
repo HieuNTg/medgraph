@@ -25,6 +25,7 @@ from medgraph.engine.analyzer import CascadeAnalyzer
 from medgraph.api.search import DrugSearcher
 from medgraph.graph.builder import GraphBuilder
 from medgraph.graph.store import GraphStore
+from medgraph.api.user_auth import UserAuth
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +68,7 @@ def _make_client(seeded_store: GraphStore) -> TestClient:
     app.state.analyzer = analyzer
     app.state.searcher = searcher
     app.state.stats_cache = (None, 0.0)
+    app.state.user_auth = UserAuth(seeded_store)
 
     client = TestClient(app, raise_server_exceptions=True)
     # Re-inject after lifespan
@@ -75,6 +77,7 @@ def _make_client(seeded_store: GraphStore) -> TestClient:
     app.state.analyzer = analyzer
     app.state.searcher = searcher
     app.state.stats_cache = (None, 0.0)
+    app.state.user_auth = UserAuth(seeded_store)
     return client
 
 

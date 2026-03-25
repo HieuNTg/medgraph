@@ -7,10 +7,21 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { AnalysisSkeleton } from "@/components/loading-skeleton";
 import { AuthProvider } from "@/lib/auth-context";
 import { ProtectedRoute } from "@/components/protected-route";
-import { HomePage } from "@/pages/home";
-import { CheckerPage } from "@/pages/checker";
-import { DrugInfoPage } from "@/pages/drug-info";
-import { AboutPage } from "@/pages/about";
+const HomePage = lazy(() =>
+  import("@/pages/home").then((m) => ({ default: m.HomePage }))
+);
+
+const CheckerPage = lazy(() =>
+  import("@/pages/checker").then((m) => ({ default: m.CheckerPage }))
+);
+
+const DrugInfoPage = lazy(() =>
+  import("@/pages/drug-info").then((m) => ({ default: m.DrugInfoPage }))
+);
+
+const AboutPage = lazy(() =>
+  import("@/pages/about").then((m) => ({ default: m.AboutPage }))
+);
 
 const ResultsPage = lazy(() =>
   import("@/pages/results").then((m) => ({ default: m.ResultsPage }))
@@ -52,12 +63,14 @@ function App() {
           <BrowserRouter>
             <Routes>
               <Route element={<AppShell />}>
-                <Route path="/" element={<HomePage />} />
+                <Route path="/" element={<Suspense fallback={<AnalysisSkeleton />}><HomePage /></Suspense>} />
                 <Route
                   path="/checker"
                   element={
                     <ErrorBoundary>
-                      <CheckerPage />
+                      <Suspense fallback={<AnalysisSkeleton />}>
+                        <CheckerPage />
+                      </Suspense>
                     </ErrorBoundary>
                   }
                 />
@@ -75,11 +88,13 @@ function App() {
                   path="/drugs/:id"
                   element={
                     <ErrorBoundary>
-                      <DrugInfoPage />
+                      <Suspense fallback={<AnalysisSkeleton />}>
+                        <DrugInfoPage />
+                      </Suspense>
                     </ErrorBoundary>
                   }
                 />
-                <Route path="/about" element={<AboutPage />} />
+                <Route path="/about" element={<Suspense fallback={<AnalysisSkeleton />}><AboutPage /></Suspense>} />
                 <Route
                   path="/login"
                   element={

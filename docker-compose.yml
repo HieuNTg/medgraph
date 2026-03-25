@@ -18,6 +18,14 @@ services:
       # Auth (optional): set MEDGRAPH_API_KEYS in .env
       # Rate limiting: MEDGRAPH_RATE_LIMIT=60 MEDGRAPH_RATE_WINDOW=60
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')"]

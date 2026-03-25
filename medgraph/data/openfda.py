@@ -89,6 +89,31 @@ class OpenFDAClient:
             logger.warning(f"OpenFDA adverse events unavailable for {drug_names}: {e}")
             return []
 
+    def search_adverse_events_pairwise(
+        self,
+        drug_names: list[str],
+        limit: int = 100,
+    ) -> list[AdverseEvent]:
+        """
+        Search FDA FAERS for adverse events using pairwise drug combinations.
+
+        For >2 drugs, queries each pair separately and merges results.
+        This avoids the AND-all-drugs query that returns near-zero results.
+        """
+        if len(drug_names) <= 2:
+            return self.search_adverse_events(drug_names, limit)
+
+        from itertools import combinations
+        seen_ids: set[str] = set()
+        all_events: list[AdverseEvent] = []
+        for pair in combinations(drug_names, 2):
+            pair_events = self.search_adverse_events(list(pair), limit)
+            for ev in pair_events:
+                if ev.id not in seen_ids:
+                    seen_ids.add(ev.id)
+                    all_events.append(ev)
+        return all_events
+
     def get_drug_label_interactions(self, drug_name: str) -> Optional[str]:
         """
         Fetch the drug interactions section from FDA drug labeling.
@@ -160,10 +185,16 @@ class OpenFDAClient:
         return hashlib.md5(raw.encode()).hexdigest()
 
     def _load_cache(self, endpoint: str, drug_names: list[str]) -> Optional[dict]:
-        """Load cached API response if available."""
+        """Load cached API response if available and not expired (30-day TTL)."""
         key = self._cache_key(endpoint, drug_names)
         cache_file = self.cache_dir / f"{key}.json"
         if cache_file.exists():
+            # Check cache age — 30-day TTL
+            cache_age = time.time() - cache_file.stat().st_mtime
+            if cache_age > 30 * 86400:
+                logger.info(f"Cache expired for {endpoint}:{drug_names} (age: {cache_age/86400:.1f}d)")
+                cache_file.unlink(missing_ok=True)
+                return None
             try:
                 with open(cache_file) as f:
                     return json.load(f)

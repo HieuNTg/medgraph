@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { setAuthToken, login as apiLogin, register as apiRegister, refreshToken as apiRefresh } from "./api";
+import { setAuthToken, login as apiLogin, register as apiRegister, refreshToken as apiRefresh, getMe } from "./api";
 import type { User } from "./types";
 
 const TOKEN_KEY = "medgraph-access-token";
@@ -26,27 +26,36 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
-  // Restore session from localStorage on mount
+  // Restore session — try cookie-based auth first, fall back to localStorage
   useEffect(() => {
-    const stored = localStorage.getItem(TOKEN_KEY);
-    const storedRefresh = localStorage.getItem(REFRESH_KEY);
-    if (!stored || !storedRefresh) return;
-
-    setAuthToken(stored);
-
-    // Try to refresh token to verify it's still valid
-    apiRefresh(storedRefresh)
-      .then((res) => {
-        localStorage.setItem(TOKEN_KEY, res.access_token);
-        localStorage.setItem(REFRESH_KEY, res.refresh_token);
-        setAuthToken(res.access_token);
-        setUser(res.user);
+    // Try cookie-based session (httpOnly cookies sent automatically)
+    getMe()
+      .then((userData) => {
+        setUser(userData);
+        // Sync localStorage token if present (backward compat)
+        const stored = localStorage.getItem(TOKEN_KEY);
+        if (stored) setAuthToken(stored);
       })
       .catch(() => {
-        // Token expired / invalid — clear session
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(REFRESH_KEY);
-        setAuthToken(null);
+        // Cookie auth failed — try localStorage refresh token
+        const storedRefresh = localStorage.getItem(REFRESH_KEY);
+        if (!storedRefresh) return;
+
+        const stored = localStorage.getItem(TOKEN_KEY);
+        if (stored) setAuthToken(stored);
+
+        apiRefresh(storedRefresh)
+          .then((res) => {
+            localStorage.setItem(TOKEN_KEY, res.access_token);
+            localStorage.setItem(REFRESH_KEY, res.refresh_token);
+            setAuthToken(res.access_token);
+            setUser(res.user);
+          })
+          .catch(() => {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(REFRESH_KEY);
+            setAuthToken(null);
+          });
       });
   }, []);
 

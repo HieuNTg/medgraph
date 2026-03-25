@@ -56,4 +56,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 
 # Run migrations, seed DB (if not already seeded via volume), then start server
 # NOTE: --workers 1 because rate limiter and token blacklist use in-memory state
-CMD ["sh", "-c", "python -m medgraph.cli db upgrade 2>/dev/null || true; python -m medgraph.cli seed 2>/dev/null || true; uvicorn medgraph.api.server:app --host 0.0.0.0 --port 8000 --workers 1"]
+CMD ["sh", "-c", "python -m medgraph.cli db upgrade 2>&1 || { echo 'ERROR: Migration failed'; exit 1; }; python -m medgraph.cli seed 2>&1 || echo 'WARN: Seed skipped (may already exist)'; exec uvicorn medgraph.api.server:app --host 0.0.0.0 --port 8000 --workers 1"]

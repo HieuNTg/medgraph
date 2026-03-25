@@ -30,6 +30,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
   const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
     headers,
     ...options,
   });
@@ -219,6 +220,7 @@ export async function exportPdfReport(
   if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
   const res = await fetch("/api/report/pdf", {
     method: "POST",
+    credentials: "include",
     headers,
     body: JSON.stringify({
       check_result: checkResult,

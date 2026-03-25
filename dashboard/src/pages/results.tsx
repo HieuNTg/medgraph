@@ -244,7 +244,7 @@ export function ResultsPage() {
       <RiskSummary response={result} />
 
       {/* Polypharmacy gauge */}
-      <PolypharmacyGauge data={polypharmacyData} />
+      {polypharmacyData && <PolypharmacyGauge data={polypharmacyData} />}
 
       {/* Knowledge Graph Visualization */}
       {hasGraphData && (

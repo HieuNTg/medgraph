@@ -53,13 +53,13 @@ from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.concurrency import run_in_threadpool
 
 from medgraph.api.audit import AuditLogger
 from medgraph.api.auth import _is_trusted_proxy, check_rate_limit, verify_api_key
-from medgraph.api.user_auth import UserAuth
+from medgraph.api.user_auth import UserAuth, cleanup_revoked_tokens
 from medgraph.api.errors import register_error_handlers
 from medgraph.api.metrics import ANALYSIS_DURATION, GRAPH_EDGES, GRAPH_NODES, setup_metrics
 from medgraph.api.middleware import RequestIDMiddleware
@@ -197,7 +197,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         f"{graph.number_of_edges()} graph edges"
     )
 
+    # Background task: clean up expired revoked tokens every 10 minutes
+    async def _token_cleanup_loop() -> None:
+        while True:
+            await asyncio.sleep(600)
+            try:
+                removed = cleanup_revoked_tokens()
+                if removed > 0:
+                    logger.info(f"Token cleanup: removed {removed} expired entries")
+            except Exception:
+                logger.exception("Token cleanup failed")
+
+    _cleanup_task = asyncio.create_task(_token_cleanup_loop())
+
     yield
+
+    _cleanup_task.cancel()
+    try:
+        await _cleanup_task
+    except asyncio.CancelledError:
+        pass
 
     logger.info("MEDGRAPH server shutting down")
 
@@ -302,6 +321,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
+        allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Api-Key", "X-Request-ID"],
         expose_headers=["X-Request-ID"],
@@ -346,13 +366,19 @@ def create_app() -> FastAPI:
     _bearer = HTTPBearer(auto_error=False)
 
     def get_current_user(
+        request: Request,
         credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     ) -> dict | None:
-        """Extract and verify JWT from Authorization header. Returns user dict or None."""
-        if credentials is None:
-            return None
+        """Extract and verify JWT from Authorization header or access_token cookie."""
         _user_auth: UserAuth = app.state.user_auth
-        payload = _user_auth.verify_token(credentials.credentials)
+        token: str | None = None
+        if credentials is not None:
+            token = credentials.credentials
+        else:
+            token = request.cookies.get("access_token")
+        if not token:
+            return None
+        payload = _user_auth.verify_token(token)
         if not payload or payload.get("type") != "access":
             return None
         return _user_auth.get_user(payload["sub"])
@@ -1316,13 +1342,45 @@ def create_app() -> FastAPI:
             for rec in recs
         ]
 
+    # ── Cookie helpers for httpOnly auth ──────────────────────────────
+    _COOKIE_SECURE = os.environ.get("MEDGRAPH_ENV", "development") == "production"
+    _COOKIE_DOMAIN = os.environ.get("MEDGRAPH_COOKIE_DOMAIN") or None
+
+    def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+        """Set httpOnly cookies for access and refresh tokens."""
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=_COOKIE_SECURE,
+            samesite="lax",
+            max_age=900,  # 15 minutes
+            path="/",
+            domain=_COOKIE_DOMAIN,
+        )
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=_COOKIE_SECURE,
+            samesite="lax",
+            max_age=604800,  # 7 days
+            path="/",
+            domain=_COOKIE_DOMAIN,
+        )
+
+    def _clear_auth_cookies(response: Response) -> None:
+        """Clear auth cookies on logout."""
+        response.delete_cookie(key="access_token", path="/", domain=_COOKIE_DOMAIN)
+        response.delete_cookie(key="refresh_token", path="/", domain=_COOKIE_DOMAIN)
+
     # ── Auth Router ───────────────────────────────────────────────────────
     auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
     @auth_router.post(
         "/register", response_model=TokenResponse, dependencies=[Depends(check_rate_limit)]
     )
-    async def register(request: Request, body: RegisterRequest) -> TokenResponse:
+    async def register(request: Request, body: RegisterRequest) -> JSONResponse:
         user_auth: UserAuth = app.state.user_auth
         audit: AuditLogger = app.state.audit_logger
         try:
@@ -1337,12 +1395,15 @@ def create_app() -> FastAPI:
             ip_address=_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         )
-        return TokenResponse(**result)
+        token_data = TokenResponse(**result)
+        response = JSONResponse(content=token_data.model_dump())
+        _set_auth_cookies(response, result["access_token"], result["refresh_token"])
+        return response
 
     @auth_router.post(
         "/login", response_model=TokenResponse, dependencies=[Depends(check_rate_limit)]
     )
-    async def login(request: Request, body: LoginRequest) -> TokenResponse:
+    async def login(request: Request, body: LoginRequest) -> JSONResponse:
         user_auth: UserAuth = app.state.user_auth
         audit: AuditLogger = app.state.audit_logger
         try:
@@ -1357,38 +1418,53 @@ def create_app() -> FastAPI:
             ip_address=_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         )
-        return TokenResponse(**result)
+        token_data = TokenResponse(**result)
+        response = JSONResponse(content=token_data.model_dump())
+        _set_auth_cookies(response, result["access_token"], result["refresh_token"])
+        return response
 
     @auth_router.post(
         "/refresh", response_model=TokenResponse, dependencies=[Depends(check_rate_limit)]
     )
-    async def refresh_token(body: RefreshRequest) -> TokenResponse:
+    async def refresh_token(body: RefreshRequest) -> JSONResponse:
         user_auth: UserAuth = app.state.user_auth
         try:
             result = user_auth.refresh(body.refresh_token)
         except ValueError as exc:
             raise HTTPException(status_code=401, detail=str(exc))
-        return TokenResponse(**result)
+        token_data = TokenResponse(**result)
+        response = JSONResponse(content=token_data.model_dump())
+        _set_auth_cookies(response, result["access_token"], result["refresh_token"])
+        return response
 
     @auth_router.post("/logout")
     async def logout(
+        request: Request,
         credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     ) -> dict:
-        if credentials is None:
-            raise HTTPException(status_code=401, detail="Authorization header required")
+        # Support both Bearer header and httpOnly cookie
+        token: str | None = None
+        if credentials is not None:
+            token = credentials.credentials
+        else:
+            token = request.cookies.get("access_token")
+        if not token:
+            raise HTTPException(status_code=401, detail="Authorization required")
         user_auth: UserAuth = app.state.user_auth
-        # Verify the token is valid before blacklisting
-        payload = user_auth.verify_token(credentials.credentials)
+        payload = user_auth.verify_token(token)
         if payload is None:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
-        user_auth.logout(credentials.credentials)
-        return {"message": "Logged out successfully"}
+        user_auth.logout(token)
+        response = JSONResponse(content={"message": "Logged out successfully"})
+        _clear_auth_cookies(response)
+        return response
 
     @auth_router.get("/me", response_model=UserResponse)
     async def get_me(user: dict = Depends(require_current_user)) -> UserResponse:
         return UserResponse(**user)
 
     app.include_router(auth_router)
+    app.include_router(auth_router, prefix="/api")  # frontend compat
 
     # ── Profile Endpoints ─────────────────────────────────────────────────
 

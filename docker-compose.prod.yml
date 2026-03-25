@@ -25,6 +25,11 @@ services:
     depends_on:
       medgraph:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
     networks:
       - medgraph-net
 
@@ -52,6 +57,14 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
     networks:
       - medgraph-net
     # Do NOT expose port 8000 — Caddy handles external traffic
@@ -68,6 +81,11 @@ services:
       - "--storage.tsdb.retention.time=30d"
       - "--web.console.libraries=/etc/prometheus/console_libraries"
       - "--web.console.templates=/etc/prometheus/consoles"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
     networks:
       - medgraph-net
     # Not exposed externally — access via Grafana or SSH tunnel
@@ -89,6 +107,11 @@ services:
       - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
     ports:
       - "127.0.0.1:3000:3000"  # localhost only
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
     depends_on:
       - prometheus
     networks:

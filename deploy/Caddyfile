@@ -18,6 +18,10 @@
 		reverse_proxy medgraph:8000
 	}
 
+	handle /auth/* {
+		reverse_proxy medgraph:8000
+	}
+
 	handle /health* {
 		reverse_proxy medgraph:8000
 	}

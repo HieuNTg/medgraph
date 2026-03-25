@@ -193,14 +193,15 @@ class CascadeAnalyzer:
 
         # Filter cascade paths for this pair using drug IDs (reliable matching)
         pair_ids = {drug_a.id, drug_b.id}
+        pair_names = {drug_a.name.lower(), drug_b.name.lower()}
         pair_cascades = [
             p
             for p in all_cascade_paths
             if (p.drug_a_id and p.drug_b_id and {p.drug_a_id, p.drug_b_id} == pair_ids)
             or (
                 not p.drug_a_id
-                and {p.drug_a_name.lower(), p.drug_b_name.lower()}
-                == {drug_a.name.lower(), drug_b.name.lower()}
+                and not p.drug_b_id
+                and {p.drug_a_name.lower(), p.drug_b_name.lower()} == pair_names
             )
         ]
 

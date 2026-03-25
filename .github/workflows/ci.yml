@@ -70,7 +70,7 @@ jobs:
             --cov=medgraph \
             --cov-report=term-missing \
             --cov-report=xml \
-            --cov-fail-under=54
+            --cov-fail-under=55
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
