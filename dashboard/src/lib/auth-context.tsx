@@ -7,11 +7,15 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { setAuthToken, login as apiLogin, register as apiRegister, refreshToken as apiRefresh, getMe } from "./api";
+import { setAuthToken, login as apiLogin, register as apiRegister, getMe } from "./api";
 import type { User } from "./types";
-
-const TOKEN_KEY = "medgraph-access-token";
-const REFRESH_KEY = "medgraph-refresh-token";
+import {
+  storeTokens,
+  clearTokens,
+  getStoredAccessToken,
+  getStoredRefreshToken,
+  useTokenRefreshInterval,
+} from "./use-auth-tokens";
 
 interface AuthState {
   user: User | null;
@@ -33,77 +37,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((userData) => {
         setUser(userData);
         // Sync localStorage token if present (backward compat)
-        const stored = localStorage.getItem(TOKEN_KEY);
+        const stored = getStoredAccessToken();
         if (stored) setAuthToken(stored);
       })
       .catch(() => {
         // Cookie auth failed — try localStorage refresh token
-        const storedRefresh = localStorage.getItem(REFRESH_KEY);
+        const storedRefresh = getStoredRefreshToken();
         if (!storedRefresh) return;
 
-        const stored = localStorage.getItem(TOKEN_KEY);
+        const stored = getStoredAccessToken();
         if (stored) setAuthToken(stored);
 
-        apiRefresh(storedRefresh)
-          .then((res) => {
-            localStorage.setItem(TOKEN_KEY, res.access_token);
-            localStorage.setItem(REFRESH_KEY, res.refresh_token);
-            setAuthToken(res.access_token);
-            setUser(res.user);
-          })
-          .catch(() => {
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(REFRESH_KEY);
-            setAuthToken(null);
-          });
+        import("./api").then(({ refreshToken: apiRefresh }) =>
+          apiRefresh(storedRefresh)
+            .then((res) => {
+              storeTokens({ access_token: res.access_token, refresh_token: res.refresh_token });
+              setUser(res.user);
+            })
+            .catch(() => {
+              clearTokens();
+            })
+        );
       });
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await apiLogin(email, password);
-    localStorage.setItem(TOKEN_KEY, res.access_token);
-    localStorage.setItem(REFRESH_KEY, res.refresh_token);
-    setAuthToken(res.access_token);
+    storeTokens({ access_token: res.access_token, refresh_token: res.refresh_token });
     setUser(res.user);
   }, []);
 
   const register = useCallback(
     async (email: string, password: string, displayName?: string) => {
       const res = await apiRegister(email, password, displayName);
-      localStorage.setItem(TOKEN_KEY, res.access_token);
-      localStorage.setItem(REFRESH_KEY, res.refresh_token);
-      setAuthToken(res.access_token);
+      storeTokens({ access_token: res.access_token, refresh_token: res.refresh_token });
       setUser(res.user);
     },
     []
   );
 
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_KEY);
-    setAuthToken(null);
+    clearTokens();
     setUser(null);
   }, []);
 
   // Proactively refresh token every 10 minutes while authenticated
-  useEffect(() => {
-    if (!user) return;
-    const id = setInterval(() => {
-      const storedRefresh = localStorage.getItem(REFRESH_KEY);
-      if (!storedRefresh) return;
-      apiRefresh(storedRefresh)
-        .then((res) => {
-          localStorage.setItem(TOKEN_KEY, res.access_token);
-          localStorage.setItem(REFRESH_KEY, res.refresh_token);
-          setAuthToken(res.access_token);
-          setUser(res.user);
-        })
-        .catch(() => {
-          // Silently ignore — will retry next interval; don't force logout
-        });
-    }, 600_000);
-    return () => clearInterval(id);
-  }, [user]);
+  useTokenRefreshInterval(user, setUser);
 
   const value = useMemo<AuthState>(
     () => ({

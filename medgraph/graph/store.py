@@ -2,17 +2,20 @@
 SQLite-backed storage for MEDGRAPH knowledge graph data.
 
 Uses synchronous sqlite3 with context manager pattern. DB file at data/medgraph.db.
+Supports DATABASE_URL env var for future PostgreSQL migration.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator, Optional
 
+from medgraph.graph.db_config import DatabaseConfig, get_db_config
 from medgraph.graph.models import (
     AdverseEvent,
     Drug,
@@ -22,6 +25,8 @@ from medgraph.graph.models import (
     GeneticGuideline,
     Interaction,
 )
+
+logger = logging.getLogger(__name__)
 
 # Default DB path — relative to project root
 DEFAULT_DB_PATH = Path("data/medgraph.db")
@@ -33,10 +38,30 @@ class GraphStore:
 
     Wraps SQLite with typed upsert/query methods for all entity types.
     DB is initialized (tables + indexes created) on first use.
+
+    Reads DATABASE_URL env var via db_config module. Currently only SQLite
+    is fully implemented; PostgreSQL support is planned for April 2026.
     """
 
-    def __init__(self, db_path: Path | str = DEFAULT_DB_PATH) -> None:
-        self.db_path = Path(db_path)
+    def __init__(self, db_path: Path | str | None = None) -> None:
+        config = get_db_config()
+        if db_path is not None:
+            # Explicit path overrides env config (backward compat)
+            self.db_path = Path(db_path)
+        elif config.db_path is not None:
+            self.db_path = config.db_path
+        else:
+            self.db_path = DEFAULT_DB_PATH
+
+        if config.is_postgresql:
+            logger.warning(
+                "DATABASE_URL points to PostgreSQL but only SQLite is currently "
+                "supported. Falling back to SQLite at %s. PostgreSQL migration "
+                "planned for April 2026.",
+                self.db_path,
+            )
+
+        self.db_config = config
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.init_db()
         self._migrate_add_is_admin()
