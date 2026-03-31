@@ -105,6 +105,7 @@ class OpenFDAClient:
             return self.search_adverse_events(drug_names, limit)
 
         from itertools import combinations
+
         seen_ids: set[str] = set()
         all_events: list[AdverseEvent] = []
         for pair in combinations(drug_names, 2):
@@ -193,7 +194,9 @@ class OpenFDAClient:
             # Check cache age — 30-day TTL
             cache_age = time.time() - cache_file.stat().st_mtime
             if cache_age > 30 * 86400:
-                logger.info(f"Cache expired for {endpoint}:{drug_names} (age: {cache_age/86400:.1f}d)")
+                logger.info(
+                    f"Cache expired for {endpoint}:{drug_names} (age: {cache_age / 86400:.1f}d)"
+                )
                 cache_file.unlink(missing_ok=True)
                 return None
             try:
@@ -436,7 +439,9 @@ class AsyncOpenFDAClient:
         if cache_file.exists():
             cache_age = time.time() - cache_file.stat().st_mtime
             if cache_age > 30 * 86400:
-                logger.info(f"Cache expired for {endpoint}:{drug_names} (age: {cache_age/86400:.1f}d)")
+                logger.info(
+                    f"Cache expired for {endpoint}:{drug_names} (age: {cache_age / 86400:.1f}d)"
+                )
                 cache_file.unlink(missing_ok=True)
                 return None
             try:

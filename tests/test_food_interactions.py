@@ -71,6 +71,7 @@ class TestFoodInteractionStore:
         store = GraphStore(tmp_path / "fi_unit.db")
         # Insert a minimal drug first to satisfy FK
         from medgraph.graph.models import Drug
+
         drug = Drug(id="drug_warfarin", name="Warfarin", brand_names=[], description="")
         store.upsert_drug(drug)
 
@@ -105,6 +106,7 @@ class TestFoodInteractionStore:
         """Insert same row twice — should replace, not duplicate."""
         store = GraphStore(tmp_path / "fi_idem.db")
         from medgraph.graph.models import Drug
+
         drug = Drug(id="drug_simvastatin", name="Simvastatin", brand_names=[], description="")
         store.upsert_drug(drug)
 
@@ -177,7 +179,9 @@ class TestFoodNodesInGraph:
         all_drugs = seeded_store.get_all_drugs()
         all_food = seeded_store.get_food_interactions([d.id for d in all_drugs])
         if all_food:
-            assert len(food_nodes) > 0, "Expected food nodes in graph when food interactions are seeded"
+            assert len(food_nodes) > 0, (
+                "Expected food nodes in graph when food interactions are seeded"
+            )
 
     def test_food_nodes_have_correct_type(self, seeded_store: GraphStore):
         builder = GraphBuilder()

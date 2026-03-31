@@ -33,19 +33,30 @@ def _drug(name: str, id: str = "DB00001") -> Drug:
 
 def _interaction(severity: str = "major", desc: str = "bleeding risk") -> Interaction:
     return Interaction(
-        id="IX1", drug_a_id="A", drug_b_id="B",
-        severity=severity, description=desc, source="seed",
+        id="IX1",
+        drug_a_id="A",
+        drug_b_id="B",
+        severity=severity,
+        description=desc,
+        source="seed",
     )
 
 
 def _cascade_step(
-    source: str = "Fluoxetine", target: str = "CYP2D6",
-    relation: str = "inhibits", strength: str = "strong",
-    target_type: str = "enzyme", effect: str = "reduced enzyme activity",
+    source: str = "Fluoxetine",
+    target: str = "CYP2D6",
+    relation: str = "inhibits",
+    strength: str = "strong",
+    target_type: str = "enzyme",
+    effect: str = "reduced enzyme activity",
 ) -> CascadeStep:
     return CascadeStep(
-        source_drug=source, target=target, relation=relation,
-        strength=strength, target_type=target_type, effect=effect,
+        source_drug=source,
+        target=target,
+        relation=relation,
+        strength=strength,
+        target_type=target_type,
+        effect=effect,
     )
 
 
@@ -60,8 +71,10 @@ def _cascade_path(steps=None, severity: str = "major") -> CascadePath:
 
 
 def _result(
-    severity: str = "major", score: float = 72.0,
-    cascade_paths=None, evidence=None,
+    severity: str = "major",
+    score: float = 72.0,
+    cascade_paths=None,
+    evidence=None,
 ) -> DrugInteractionResult:
     return DrugInteractionResult(
         drug_a=_drug("Warfarin", "DB00001"),
@@ -112,9 +125,11 @@ class TestExplainInteraction:
 
     def test_no_direct_interaction(self) -> None:
         r = DrugInteractionResult(
-            drug_a=_drug("DrugA"), drug_b=_drug("DrugB"),
+            drug_a=_drug("DrugA"),
+            drug_b=_drug("DrugB"),
             cascade_paths=[_cascade_path()],
-            risk_score=45.0, severity="moderate",
+            risk_score=45.0,
+            severity="moderate",
         )
         text = explain_interaction(r)
         assert "DrugA" in text
@@ -135,8 +150,11 @@ class TestExplainCascadePath:
 
     def test_empty_steps_returns_empty(self) -> None:
         path = CascadePath(
-            steps=[], net_severity="minor", description="",
-            drug_a_name="A", drug_b_name="B",
+            steps=[],
+            net_severity="minor",
+            description="",
+            drug_a_name="A",
+            drug_b_name="B",
         )
         assert explain_cascade_path(path) == ""
 
@@ -148,8 +166,11 @@ class TestExplainCascadePath:
         steps = [
             _cascade_step(source="Fluoxetine", target="CYP2D6", relation="inhibits"),
             _cascade_step(
-                source="Codeine", target="CYP2D6", relation="metabolized_by",
-                target_type="enzyme", effect="reduced metabolism",
+                source="Codeine",
+                target="CYP2D6",
+                relation="metabolized_by",
+                target_type="enzyme",
+                effect="reduced metabolism",
             ),
         ]
         text = explain_cascade_path(_cascade_path(steps=steps))
@@ -164,8 +185,11 @@ class TestExplainCascadePath:
 class TestExplainPGxImpact:
     def test_increased_risk(self) -> None:
         gl = GeneticGuideline(
-            drug_id="DB00001", gene_id="CYP2D6", phenotype="poor",
-            recommendation="Consider dose reduction", severity_multiplier=1.5,
+            drug_id="DB00001",
+            gene_id="CYP2D6",
+            phenotype="poor",
+            recommendation="Consider dose reduction",
+            severity_multiplier=1.5,
         )
         text = explain_pgx_impact("Fluoxetine", "CYP2D6", "poor", gl)
         assert "poor metabolizer" in text
@@ -175,8 +199,11 @@ class TestExplainPGxImpact:
 
     def test_decreased_risk(self) -> None:
         gl = GeneticGuideline(
-            drug_id="DB00318", gene_id="CYP2D6", phenotype="poor",
-            recommendation="Avoid codeine", severity_multiplier=0.5,
+            drug_id="DB00318",
+            gene_id="CYP2D6",
+            phenotype="poor",
+            recommendation="Avoid codeine",
+            severity_multiplier=0.5,
         )
         text = explain_pgx_impact("Codeine", "CYP2D6", "poor", gl)
         assert "decreases" in text
@@ -184,8 +211,11 @@ class TestExplainPGxImpact:
 
     def test_normal_no_impact(self) -> None:
         gl = GeneticGuideline(
-            drug_id="DB00001", gene_id="CYP2D6", phenotype="normal",
-            recommendation="", severity_multiplier=1.0,
+            drug_id="DB00001",
+            gene_id="CYP2D6",
+            phenotype="normal",
+            recommendation="",
+            severity_multiplier=1.0,
         )
         text = explain_pgx_impact("Warfarin", "CYP2D6", "normal", gl)
         assert "No significant impact" in text
@@ -199,7 +229,10 @@ class TestExplainPGxImpact:
 class TestExplainReport:
     def test_empty_report(self) -> None:
         report = InteractionReport(
-            drugs=[], interactions=[], overall_risk="minor", overall_score=0.0,
+            drugs=[],
+            interactions=[],
+            overall_risk="minor",
+            overall_score=0.0,
         )
         text = explain_report(report)
         assert "No drug interactions" in text
@@ -208,7 +241,8 @@ class TestExplainReport:
         report = InteractionReport(
             drugs=[_drug("Warfarin"), _drug("Aspirin")],
             interactions=[_result()],
-            overall_risk="major", overall_score=72.0,
+            overall_risk="major",
+            overall_score=72.0,
         )
         text = explain_report(report)
         assert "2 medications" in text
@@ -221,7 +255,8 @@ class TestExplainReport:
         report = InteractionReport(
             drugs=[_drug("W"), _drug("A")],
             interactions=[_result(severity="critical", score=90.0)],
-            overall_risk="critical", overall_score=90.0,
+            overall_risk="critical",
+            overall_score=90.0,
         )
         text = explain_report(report)
         assert "Key concerns" in text
@@ -231,7 +266,8 @@ class TestExplainReport:
         report = InteractionReport(
             drugs=[_drug("W"), _drug("A")],
             interactions=[_result(cascade_paths=[_cascade_path(), _cascade_path()])],
-            overall_risk="major", overall_score=72.0,
+            overall_risk="major",
+            overall_score=72.0,
         )
         text = explain_report(report)
         assert "cascade" in text.lower()

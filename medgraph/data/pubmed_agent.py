@@ -31,9 +31,20 @@ _REQUEST_INTERVAL = 0.34  # seconds between requests (~3/sec)
 
 # Interaction-related keywords for relevance scoring
 _RELEVANCE_KEYWORDS = [
-    "interaction", "interactions", "drug-drug", "adverse", "toxicity",
-    "effect", "contraindication", "pharmacokinetic", "metabolism",
-    "inhibit", "induc", "substrate", "cyp450", "enzyme",
+    "interaction",
+    "interactions",
+    "drug-drug",
+    "adverse",
+    "toxicity",
+    "effect",
+    "contraindication",
+    "pharmacokinetic",
+    "metabolism",
+    "inhibit",
+    "induc",
+    "substrate",
+    "cyp450",
+    "enzyme",
 ]
 
 
@@ -189,6 +200,7 @@ class PubMedAgent:
         try:
             try:
                 import defusedxml.ElementTree as SafeET
+
                 root = SafeET.fromstring(xml_text)
             except ImportError:
                 root = ET.fromstring(xml_text)
@@ -204,7 +216,11 @@ class PubMedAgent:
             title_elem = article_elem.find(".//ArticleTitle")
             title = title_elem.text or "" if title_elem is not None else ""
             # Strip XML tags from title (may contain <i>, <b> etc.)
-            title = ET.tostring(title_elem, encoding="unicode", method="text") if title_elem is not None else ""
+            title = (
+                ET.tostring(title_elem, encoding="unicode", method="text")
+                if title_elem is not None
+                else ""
+            )
 
             # Abstract: concatenate all AbstractText sections
             abstract_parts = []

@@ -213,9 +213,7 @@ class TestRefreshService:
         assert info["days_since_refresh"] is not None
         assert info["days_since_refresh"] < 1.0
 
-    def test_get_freshness_stale(
-        self, tmp_store: GraphStore, refresh_svc: RefreshService
-    ) -> None:
+    def test_get_freshness_stale(self, tmp_store: GraphStore, refresh_svc: RefreshService) -> None:
         # Manually insert old record
         with tmp_store._connect() as conn:
             old_ts = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
@@ -256,9 +254,7 @@ class TestRefreshService:
         assert row is not None
         assert row["status"] == "completed"
 
-    def test_trigger_refresh_with_mocked_api(
-        self, tmp_store: GraphStore
-    ) -> None:
+    def test_trigger_refresh_with_mocked_api(self, tmp_store: GraphStore) -> None:
         """Test full refresh flow with mocked OpenFDA response."""
         from medgraph.data.seed import DataSeeder
 

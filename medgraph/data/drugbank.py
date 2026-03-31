@@ -299,6 +299,7 @@ def import_drugbank_full(
             TextColumn,
             TimeElapsedColumn,
         )
+
         _rich_available = True
     except ImportError:
         _rich_available = False
@@ -306,8 +307,7 @@ def import_drugbank_full(
     # Collect existing drug names for duplicate detection
     with store._connect() as conn:
         existing_names: set[str] = {
-            row[0].lower()
-            for row in conn.execute("SELECT name FROM drugs").fetchall()
+            row[0].lower() for row in conn.execute("SELECT name FROM drugs").fetchall()
         }
 
     stats = {"inserted": 0, "skipped": 0, "errors": 0}
@@ -332,9 +332,9 @@ def import_drugbank_full(
                             drug.rxnorm_cui,
                             drug.category if hasattr(drug, "category") else None,
                             None,
-                            __import__("datetime").datetime.now(
-                                __import__("datetime").timezone.utc
-                            ).isoformat(),
+                            __import__("datetime")
+                            .datetime.now(__import__("datetime").timezone.utc)
+                            .isoformat(),
                         ),
                     )
                     stats["inserted"] += 1

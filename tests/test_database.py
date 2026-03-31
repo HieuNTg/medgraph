@@ -397,6 +397,7 @@ class TestAdverseEventJunctionTable:
     def test_no_like_in_query(self, store):
         """get_adverse_events uses JOIN not LIKE — no full table scan path."""
         import inspect
+
         source = inspect.getsource(store.get_adverse_events)
         assert "LIKE" not in source
         assert "JOIN" in source

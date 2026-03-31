@@ -21,10 +21,10 @@ logger = logging.getLogger(__name__)
 
 # Available time slots (label → hour in 24h format)
 TIME_SLOTS: dict[str, int] = {
-    "morning": 8,    # 8:00 AM
-    "noon": 12,      # 12:00 PM
-    "evening": 18,   # 6:00 PM
-    "night": 22,     # 10:00 PM
+    "morning": 8,  # 8:00 AM
+    "noon": 12,  # 12:00 PM
+    "evening": 18,  # 6:00 PM
+    "night": 22,  # 10:00 PM
 }
 
 # Minimum hours between interacting drugs
@@ -91,7 +91,7 @@ def _all_slots_for_frequency(frequency: int) -> list[list[str]]:
         return [
             [a, b]
             for i, a in enumerate(slot_names)
-            for b in slot_names[i + 1:]
+            for b in slot_names[i + 1 :]
             if _hours_between(a, b) >= 8
         ]
     # 3x/day default: morning, noon, evening
@@ -134,7 +134,7 @@ class ScheduleOptimizer:
 
         # Build adjacency: drug_id → set of conflicting drug_ids
         conflict_map: dict[str, set[str]] = {d["drug_id"]: set() for d in drugs}
-        for a, b in (interactions or []):
+        for a, b in interactions or []:
             if a in conflict_map:
                 conflict_map[a].add(b)
             if b in conflict_map:
@@ -153,9 +153,7 @@ class ScheduleOptimizer:
             drug_name = drug_info.get("drug_name", drug_id)
             frequency = max(1, min(3, int(drug_info.get("frequency", 1))))
 
-            best_slots = self._find_best_slots(
-                drug_id, frequency, conflict_map, slot_assignments
-            )
+            best_slots = self._find_best_slots(drug_id, frequency, conflict_map, slot_assignments)
 
             if best_slots is None:
                 # No conflict-free placement possible — use any valid slots and warn
@@ -217,11 +215,7 @@ class ScheduleOptimizer:
         for combo in candidates:
             combo_hours = [TIME_SLOTS[s] for s in combo]
             # Check all slots in combo are far enough from all conflict hours
-            if all(
-                abs(h - ch) >= MIN_HOURS_APART
-                for h in combo_hours
-                for ch in conflict_hours
-            ):
+            if all(abs(h - ch) >= MIN_HOURS_APART for h in combo_hours for ch in conflict_hours):
                 return combo
 
         # No clean separation possible

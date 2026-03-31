@@ -96,9 +96,7 @@ class IncrementalFAERSClient:
         if not drug_names:
             return []
 
-        query_parts = [
-            f'patient.drug.openfda.generic_name:"{name}"' for name in drug_names
-        ]
+        query_parts = [f'patient.drug.openfda.generic_name:"{name}"' for name in drug_names]
         # Incremental date filter (receivedate >= since)
         since_str = since.strftime("%Y%m%d")
         date_filter = f"receivedate:[{since_str}+TO+*]"
@@ -128,20 +126,24 @@ class IncrementalFAERSClient:
                     elif resp.status_code == 404:
                         return {}  # No results — not an error
                     elif resp.status_code == 429:
-                        wait = _BACKOFF_BASE * (2 ** attempt)
+                        wait = _BACKOFF_BASE * (2**attempt)
                         logger.warning(
                             "OpenFDA rate limited — backing off %.1fs (attempt %d/%d)",
-                            wait, attempt + 1, _MAX_RETRIES,
+                            wait,
+                            attempt + 1,
+                            _MAX_RETRIES,
                         )
                         await asyncio.sleep(wait)
                     else:
                         logger.warning("OpenFDA HTTP %d for %s", resp.status_code, url)
                         return {}
             except httpx.TimeoutException:
-                wait = _BACKOFF_BASE * (2 ** attempt)
+                wait = _BACKOFF_BASE * (2**attempt)
                 logger.warning(
                     "OpenFDA timeout on attempt %d/%d — retrying in %.1fs",
-                    attempt + 1, _MAX_RETRIES, wait,
+                    attempt + 1,
+                    _MAX_RETRIES,
+                    wait,
                 )
                 if attempt < _MAX_RETRIES - 1:
                     await asyncio.sleep(wait)
@@ -151,9 +153,7 @@ class IncrementalFAERSClient:
         logger.error("OpenFDA: exhausted %d retries for %s", _MAX_RETRIES, url)
         return {}
 
-    def _parse_and_validate(
-        self, data: dict, drug_names: list[str]
-    ) -> list[AdverseEvent]:
+    def _parse_and_validate(self, data: dict, drug_names: list[str]) -> list[AdverseEvent]:
         """
         Parse count-endpoint response into AdverseEvent objects.
 
@@ -187,9 +187,7 @@ class IncrementalFAERSClient:
                 continue
 
             # Deduplication
-            dedup_key = hashlib.md5(
-                f"{':'.join(sorted(drug_names))}:{term}".encode()
-            ).hexdigest()
+            dedup_key = hashlib.md5(f"{':'.join(sorted(drug_names))}:{term}".encode()).hexdigest()
             if dedup_key in seen:
                 continue
             seen.add(dedup_key)
@@ -308,7 +306,9 @@ class RefreshService:
 
         logger.info(
             "Refresh job %s finished — status=%s records_updated=%d",
-            job.job_id, job.status, job.records_updated,
+            job.job_id,
+            job.status,
+            job.records_updated,
         )
         return job
 
@@ -349,7 +349,9 @@ class RefreshService:
 
         return {
             "last_refresh": last_refresh_str,
-            "last_successful_source": source if (row and row.get("status") == "completed") else None,
+            "last_successful_source": source
+            if (row and row.get("status") == "completed")
+            else None,
             "days_since_refresh": round(days_since, 4) if days_since is not None else None,
             "is_fresh": is_fresh,
             "data_version": data_version,
@@ -397,9 +399,7 @@ class RefreshService:
             )
             for event in events:
                 # Resolve drug names to IDs so FK constraints are satisfied
-                resolved_ids = [
-                    name_to_id.get(name.lower(), name) for name in event.drug_ids
-                ]
+                resolved_ids = [name_to_id.get(name.lower(), name) for name in event.drug_ids]
                 event = event.model_copy(update={"drug_ids": resolved_ids})
                 try:
                     self._store.upsert_adverse_event(event)
@@ -407,7 +407,9 @@ class RefreshService:
                 except Exception:
                     logger.debug("Failed to upsert adverse event %s", event.id, exc_info=True)
 
-        logger.info("Incremental FAERS refresh: %d records upserted (since %s)", total, since.date())
+        logger.info(
+            "Incremental FAERS refresh: %d records upserted (since %s)", total, since.date()
+        )
         return total
 
     def _get_legacy_metadata(self, key: str) -> str | None:

@@ -236,7 +236,7 @@ class PolypharmacyOptimizer:
             total_score = 0.0
             pair_count = 0
             for i, da in enumerate(drug_nodes):
-                for db in drug_nodes[i + 1:]:
+                for db in drug_nodes[i + 1 :]:
                     shared = drug_enzymes[da] & drug_enzymes[db]
                     if not shared:
                         continue
@@ -245,13 +245,17 @@ class PolypharmacyOptimizer:
                         rel_a = drug_relations[da].get(enz, "")
                         rel_b = drug_relations[db].get(enz, "")
                         # Inhibitor + substrate = high risk
-                        if ("inhibits" in rel_a and "metabolized_by" in rel_b) or \
-                           ("inhibits" in rel_b and "metabolized_by" in rel_a):
-                            strength_bonus = 20.0 if "strong" in rel_a or "strong" in rel_b else 10.0
+                        if ("inhibits" in rel_a and "metabolized_by" in rel_b) or (
+                            "inhibits" in rel_b and "metabolized_by" in rel_a
+                        ):
+                            strength_bonus = (
+                                20.0 if "strong" in rel_a or "strong" in rel_b else 10.0
+                            )
                             total_score += 30.0 + strength_bonus
                         # Inducer + substrate = moderate risk
-                        elif ("induces" in rel_a and "metabolized_by" in rel_b) or \
-                             ("induces" in rel_b and "metabolized_by" in rel_a):
+                        elif ("induces" in rel_a and "metabolized_by" in rel_b) or (
+                            "induces" in rel_b and "metabolized_by" in rel_a
+                        ):
                             total_score += 20.0
                         # Both substrates = minor competition
                         elif "metabolized_by" in rel_a and "metabolized_by" in rel_b:

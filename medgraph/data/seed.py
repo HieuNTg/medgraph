@@ -116,7 +116,9 @@ class DataSeeder:
             # Step 2c: DrugBank-expansion seed data (200+ additional drugs)
             task = progress.add_task("Seeding DrugBank-expansion drugs...", total=None)
             self._seed_drugbank_expansion_drugs()
-            progress.update(task, description="DrugBank-expansion drugs seeded", completed=1, total=1)
+            progress.update(
+                task, description="DrugBank-expansion drugs seeded", completed=1, total=1
+            )
 
             task = progress.add_task("Seeding DrugBank-expansion interactions...", total=None)
             self._seed_drugbank_expansion_interactions()
@@ -180,8 +182,15 @@ class DataSeeder:
             return
         rows = [
             (
-                d.id, d.name, json.dumps(d.brand_names), d.description,
-                d.drug_class, d.rxnorm_cui, d.category, d.last_updated, d.atc_code,
+                d.id,
+                d.name,
+                json.dumps(d.brand_names),
+                d.description,
+                d.drug_class,
+                d.rxnorm_cui,
+                d.category,
+                d.last_updated,
+                d.atc_code,
             )
             for d in drugs
         ]
@@ -210,9 +219,18 @@ class DataSeeder:
             return
         rows = [
             (
-                i.id, i.drug_a_id, i.drug_b_id, i.severity, i.description,
-                i.mechanism, i.source, i.evidence_count, i.evidence_level,
-                i.source_citation, i.last_updated, i.clinical_significance,
+                i.id,
+                i.drug_a_id,
+                i.drug_b_id,
+                i.severity,
+                i.description,
+                i.mechanism,
+                i.source,
+                i.evidence_count,
+                i.evidence_level,
+                i.source_citation,
+                i.last_updated,
+                i.clinical_significance,
             )
             for i in interactions
         ]
@@ -242,10 +260,7 @@ class DataSeeder:
         """Insert/update a list of DrugEnzymeRelation objects in a single transaction."""
         if not relations:
             return
-        rows = [
-            (r.drug_id, r.enzyme_id, r.relation_type, r.strength)
-            for r in relations
-        ]
+        rows = [(r.drug_id, r.enzyme_id, r.relation_type, r.strength) for r in relations]
         with self.store._connect() as conn:
             conn.executemany(
                 """

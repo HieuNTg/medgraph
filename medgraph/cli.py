@@ -594,8 +594,7 @@ def enrich_pubmed(db: str, max_pairs: int, max_results: int) -> None:
     # Get top interactions to enrich
     with store._connect() as conn:
         rows = conn.execute(
-            "SELECT id, drug_a_id, drug_b_id FROM interactions "
-            "ORDER BY evidence_count ASC LIMIT ?",
+            "SELECT id, drug_a_id, drug_b_id FROM interactions ORDER BY evidence_count ASC LIMIT ?",
             (max_pairs,),
         ).fetchall()
 

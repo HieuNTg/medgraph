@@ -657,17 +657,13 @@ class TestPredictPhenotypeFromAlleles:
 
     def test_unknown_allele_pair(self):
         """Unknown allele pair should return 'unknown' with 0.0 confidence."""
-        phenotype, confidence = predict_phenotype_from_alleles(
-            "CYP2D6", "*999", "*888"
-        )
+        phenotype, confidence = predict_phenotype_from_alleles("CYP2D6", "*999", "*888")
         assert phenotype == "unknown"
         assert confidence == 0.0
 
     def test_unknown_gene(self):
         """Unknown gene should return 'unknown'."""
-        phenotype, confidence = predict_phenotype_from_alleles(
-            "UNKNOWN_GENE", "*1", "*1"
-        )
+        phenotype, confidence = predict_phenotype_from_alleles("UNKNOWN_GENE", "*1", "*1")
         assert phenotype == "unknown"
         assert confidence == 0.0
 

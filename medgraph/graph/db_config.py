@@ -74,6 +74,5 @@ def get_db_config() -> DatabaseConfig:
         )
 
     raise ValueError(
-        f"Unsupported DATABASE_URL scheme: {url[:20]}... "
-        "Expected sqlite:/// or postgresql://"
+        f"Unsupported DATABASE_URL scheme: {url[:20]}... Expected sqlite:/// or postgresql://"
     )

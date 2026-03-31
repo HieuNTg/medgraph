@@ -288,9 +288,7 @@ class TestJSONReportEndpoint:
 
     def test_json_report_compact(self, client: TestClient) -> None:
         check = self._get_check_result(client)
-        resp = client.post(
-            "/api/report/json", json={"check_result": check, "pretty": False}
-        )
+        resp = client.post("/api/report/json", json={"check_result": check, "pretty": False})
         assert resp.status_code == 200
 
 

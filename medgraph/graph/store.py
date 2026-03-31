@@ -310,9 +310,7 @@ class GraphStore:
     def _migrate_add_is_admin(self) -> None:
         """Add is_admin column to existing users table if missing."""
         with self._connect() as conn:
-            columns = [
-                row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()
-            ]
+            columns = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
             if "is_admin" not in columns:
                 conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
 
@@ -952,9 +950,7 @@ class GraphStore:
     # Refresh metadata (FAERS pipeline)
     # -------------------------------------------------------------------------
 
-    def save_refresh_metadata(
-        self, source: str, records_updated: int, status: str
-    ) -> None:
+    def save_refresh_metadata(self, source: str, records_updated: int, status: str) -> None:
         """Insert a refresh run record into refresh_metadata."""
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:

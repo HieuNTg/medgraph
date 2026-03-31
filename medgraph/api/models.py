@@ -485,8 +485,7 @@ class PGxCheckRequest(BaseModel):
     def validate_ancestry(cls, v: str | None) -> str | None:
         if v is not None and v.lower() not in _VALID_ANCESTRY:
             raise ValueError(
-                f"Invalid ancestry '{v}'. "
-                f"Must be one of: {', '.join(sorted(_VALID_ANCESTRY))}"
+                f"Invalid ancestry '{v}'. Must be one of: {', '.join(sorted(_VALID_ANCESTRY))}"
             )
         return v
 

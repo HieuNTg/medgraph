@@ -181,6 +181,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # PGxScorer singleton — avoids per-request instantiation (cache preserved)
     try:
         from medgraph.engine.pgx_scorer import PGxScorer
+
         app.state.pgx_scorer = PGxScorer(store)
     except ImportError:
         app.state.pgx_scorer = None
@@ -965,9 +966,7 @@ def create_app() -> FastAPI:
             suggestions: dict[str, list[str]] = {}
             for name in unresolved:
                 broad = (
-                    await run_in_threadpool(searcher.search, name[:3], 5)
-                    if len(name) >= 3
-                    else []
+                    await run_in_threadpool(searcher.search, name[:3], 5) if len(name) >= 3 else []
                 )
                 suggestions[name] = [d.name for d in broad]
             raise HTTPException(

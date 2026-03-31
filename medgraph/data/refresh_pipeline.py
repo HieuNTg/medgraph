@@ -212,7 +212,9 @@ class DataRefreshPipeline:
             except Exception as exc:
                 logger.debug("FAERS batch error for %s+%s: %s", drug_a, drug_b, exc)
 
-        logger.info("Batch FAERS enrichment: %d records inserted for %d pairs", inserted, len(drug_pairs))
+        logger.info(
+            "Batch FAERS enrichment: %d records inserted for %d pairs", inserted, len(drug_pairs)
+        )
         return inserted
 
     def get_freshness(self) -> dict:
