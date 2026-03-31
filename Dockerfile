@@ -32,6 +32,7 @@ COPY medgraph/__init__.py ./medgraph/__init__.py
 RUN pip install --no-cache-dir .
 
 # Copy full application code
+COPY alembic.ini ./
 COPY medgraph/ ./medgraph/
 
 # Copy built frontend into static serving location
