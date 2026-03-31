@@ -9,12 +9,10 @@ NCBI E-utilities docs: https://www.ncbi.nlm.nih.gov/books/NBK25499/
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 from urllib.parse import urlencode
 from urllib.request import urlopen

@@ -181,7 +181,6 @@ class ScheduleOptimizer:
             )
 
         # Build result schedule: slot → drugs
-        drug_by_id = {s.drug_id: s for s in scheduled}
         result_schedule: dict[str, list[ScheduledDrug]] = {slot: [] for slot in TIME_SLOTS}
         for sched_drug in scheduled:
             for slot in sched_drug.time_slots:

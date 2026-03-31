@@ -7,7 +7,6 @@ and tracks refresh history in the schema_metadata table.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone

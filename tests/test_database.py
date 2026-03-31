@@ -384,7 +384,7 @@ class TestAdverseEventJunctionTable:
         conn.close()
 
         # Init store — backfill should run since junction is empty
-        store = GraphStore(temp_db)
+        GraphStore(temp_db)
         conn2 = sqlite3.connect(temp_db)
         rows = conn2.execute(
             "SELECT drug_id FROM adverse_event_drugs WHERE event_id = 'EVT_OLD' ORDER BY drug_id"

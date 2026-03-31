@@ -615,7 +615,7 @@ def enrich_pubmed(db: str, max_pairs: int, max_results: int) -> None:
 
     total_articles = 0
     for i, row in enumerate(rows, 1):
-        interaction_id, drug_a_id, drug_b_id = row[0], row[1], row[2]
+        _, drug_a_id, drug_b_id = row[0], row[1], row[2]
         console.print(f"  [{i}/{len(rows)}] Enriching {drug_a_id} + {drug_b_id}…", end=" ")
         articles = enrich_interaction(store, drug_a_id, drug_b_id, agent=agent)
         console.print(f"[green]{len(articles)} articles[/]")

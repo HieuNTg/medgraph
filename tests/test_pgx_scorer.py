@@ -16,7 +16,6 @@ Patient safety critical: 0% → 100% coverage target.
 from __future__ import annotations
 
 import pytest
-from unittest.mock import Mock, MagicMock
 
 from medgraph.engine.pgx_scorer import (
     PGxScorer,
@@ -736,7 +735,7 @@ class TestGetAdjustmentsForDrug:
 
     def test_get_adjustments_multiple_matches(self, pgx_scorer: PGxScorer):
         """Drug with multiple phenotype matches should return all."""
-        phenotypes = {"CYP2D6": PHENOTYPE_POOR, "CYP2D6": PHENOTYPE_ULTRARAPID}
+        phenotypes = {"CYP2D6": PHENOTYPE_ULTRARAPID}
         adjustments = pgx_scorer.get_adjustments_for_drug(
             drug_id="DB00521",
             drug_name="Codeine",

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import networkx as nx
-import pytest
 
 from medgraph.engine.enzyme_indexer import EnzymeIndexer
 
@@ -105,6 +104,5 @@ class TestEnzymeIndexer:
         for enzyme_id, roles in index.items():
             inhibitors = roles["inhibitors"]
             inducers = roles["inducers"]
-            substrates = roles["substrates"]
             # Sets should be disjoint (a drug can't both inhibit and induce same enzyme here)
             assert not (inhibitors & inducers), f"{enzyme_id}: same drug in inhibitors AND inducers"

@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator, Optional
 
-from medgraph.graph.db_config import DatabaseConfig, get_db_config
+from medgraph.graph.db_config import get_db_config
 from medgraph.graph.models import (
     AdverseEvent,
     Drug,
