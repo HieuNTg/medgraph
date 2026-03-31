@@ -231,7 +231,7 @@ class ScheduleOptimizer:
                 rows = conn.execute(
                     f"""SELECT drug_a_id, drug_b_id FROM interactions
                         WHERE drug_a_id IN ({placeholders})
-                        AND drug_b_id IN ({placeholders})""",
+                        AND drug_b_id IN ({placeholders})""",  # nosec B608
                     drug_ids + drug_ids,
                 ).fetchall()
             return [(row[0], row[1]) for row in rows]

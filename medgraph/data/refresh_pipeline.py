@@ -207,7 +207,7 @@ class DataRefreshPipeline:
                     try:
                         self._store.upsert_adverse_event(ae)
                         inserted += 1
-                    except Exception:
+                    except Exception:  # nosec B110 — skip individual upsert failures
                         pass
             except Exception as exc:
                 logger.debug("FAERS batch error for %s+%s: %s", drug_a, drug_b, exc)

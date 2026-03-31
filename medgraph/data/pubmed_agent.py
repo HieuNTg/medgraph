@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import time
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405 — defusedxml used when available
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 from urllib.parse import urlencode
@@ -89,7 +89,7 @@ def _score_relevance(title: str, abstract: str) -> float:
 def _fetch_url(url: str, params: dict, timeout: int = 10) -> str:
     """Perform a simple GET request using urllib (no extra deps required)."""
     full_url = f"{url}?{urlencode(params)}"
-    with urlopen(full_url, timeout=timeout) as resp:  # noqa: S310
+    with urlopen(full_url, timeout=timeout) as resp:  # noqa: S310  # nosec B310
         return resp.read().decode("utf-8")
 
 
@@ -162,7 +162,7 @@ class PubMedAgent:
         try:
             self._rate_limit()
             xml_text = _fetch_url(_ESEARCH_URL, params, self.timeout)
-            root = ET.fromstring(xml_text)
+            root = ET.fromstring(xml_text)  # nosec B314 — trusted PubMed API response
             pmids = [id_elem.text for id_elem in root.findall(".//Id") if id_elem.text]
             logger.debug("esearch %s+%s: %d PMIDs found", drug_a, drug_b, len(pmids))
             return pmids
@@ -203,7 +203,7 @@ class PubMedAgent:
 
                 root = SafeET.fromstring(xml_text)
             except ImportError:
-                root = ET.fromstring(xml_text)
+                root = ET.fromstring(xml_text)  # nosec B314 — fallback when defusedxml unavailable
         except ET.ParseError as exc:
             logger.warning("Failed to parse PubMed XML: %s", exc)
             return []

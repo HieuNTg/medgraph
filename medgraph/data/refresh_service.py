@@ -187,7 +187,9 @@ class IncrementalFAERSClient:
                 continue
 
             # Deduplication
-            dedup_key = hashlib.md5(f"{':'.join(sorted(drug_names))}:{term}".encode()).hexdigest()
+            dedup_key = hashlib.md5(
+                f"{':'.join(sorted(drug_names))}:{term}".encode(), usedforsecurity=False
+            ).hexdigest()
             if dedup_key in seen:
                 continue
             seen.add(dedup_key)

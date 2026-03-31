@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 _logger = logging.getLogger(__name__)
-_DEV_SECRET = "medgraph-dev-secret"
+_DEV_SECRET = "medgraph-dev-secret"  # nosec B105 — fallback only when env var unset
 
 # Track failed login attempts per email: {email: (count, first_attempt_time)}
 _login_attempts: dict[str, tuple[int, float]] = {}
@@ -210,7 +210,7 @@ class UserAuth:
             exp = payload.get("exp", 0)
             if jti:
                 _revoke_token(jti, float(exp))
-        except Exception:
+        except Exception:  # nosec B110 — best-effort revocation on logout
             pass
 
     # ------------------------------------------------------------------
@@ -312,7 +312,7 @@ class UserAuth:
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "token_type": "bearer",
+            "token_type": "bearer",  # nosec B105 — OAuth2 token type, not a password
             "user": {
                 "id": user["id"],
                 "email": user["email"],

@@ -35,8 +35,8 @@ class AuditLogger:
                 user_agent=user_agent,
                 created_at=datetime.now(timezone.utc).isoformat(),
             )
-        except Exception:
-            pass  # Audit failures must not break primary operations
+        except Exception:  # nosec B110 — audit failures must not break primary operations
+            pass
 
     def get_logs(
         self,

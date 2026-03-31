@@ -184,7 +184,7 @@ class OpenFDAClient:
     def _cache_key(self, endpoint: str, drug_names: list[str]) -> str:
         """Generate a filesystem-safe cache key."""
         raw = f"{endpoint}:{':'.join(sorted(drug_names))}"
-        return hashlib.md5(raw.encode()).hexdigest()
+        return hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()
 
     def _load_cache(self, endpoint: str, drug_names: list[str]) -> Optional[dict]:
         """Load cached API response if available and not expired (30-day TTL)."""
@@ -202,7 +202,7 @@ class OpenFDAClient:
             try:
                 with open(cache_file) as f:
                     return json.load(f)
-            except Exception:
+            except Exception:  # nosec B110 — cache miss is not an error
                 pass
         return None
 
@@ -223,7 +223,9 @@ class OpenFDAClient:
         for i, item in enumerate(results):
             term = item.get("term", "Unknown reaction")
             count = item.get("count", 0)
-            key = hashlib.md5(f"{':'.join(sorted(drug_names))}:{term}".encode()).hexdigest()[:12]
+            key = hashlib.md5(
+                f"{':'.join(sorted(drug_names))}:{term}".encode(), usedforsecurity=False
+            ).hexdigest()[:12]
             events.append(
                 AdverseEvent(
                     id=f"FAERS-{key}",
@@ -430,7 +432,7 @@ class AsyncOpenFDAClient:
     def _cache_key(self, endpoint: str, drug_names: list[str]) -> str:
         """Generate a filesystem-safe cache key."""
         raw = f"{endpoint}:{':'.join(sorted(drug_names))}"
-        return hashlib.md5(raw.encode()).hexdigest()
+        return hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()
 
     def _load_cache(self, endpoint: str, drug_names: list[str]) -> Optional[dict]:
         """Load cached API response if available and not expired (30-day TTL)."""
@@ -447,7 +449,7 @@ class AsyncOpenFDAClient:
             try:
                 with open(cache_file) as f:
                     return json.load(f)
-            except Exception:
+            except Exception:  # nosec B110 — cache miss is not an error
                 pass
         return None
 
@@ -468,7 +470,9 @@ class AsyncOpenFDAClient:
         for item in results:
             term = item.get("term", "Unknown reaction")
             count = item.get("count", 0)
-            key = hashlib.md5(f"{':'.join(sorted(drug_names))}:{term}".encode()).hexdigest()[:12]
+            key = hashlib.md5(
+                f"{':'.join(sorted(drug_names))}:{term}".encode(), usedforsecurity=False
+            ).hexdigest()[:12]
             events.append(
                 AdverseEvent(
                     id=f"FAERS-{key}",

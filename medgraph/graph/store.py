@@ -477,7 +477,8 @@ class GraphStore:
         placeholders = ",".join("?" * len(drug_ids))
         with self._connect() as conn:
             rows = conn.execute(
-                f"SELECT * FROM drugs WHERE id IN ({placeholders})", drug_ids
+                f"SELECT * FROM drugs WHERE id IN ({placeholders})",  # nosec B608
+                drug_ids,
             ).fetchall()
         return {r["id"]: self._row_to_drug(r) for r in rows}
 
@@ -511,9 +512,9 @@ class GraphStore:
         pattern = f"%{escaped}%"
         where = "WHERE LOWER(name) LIKE LOWER(?) ESCAPE '\\'"
         with self._connect() as conn:
-            total = conn.execute(f"SELECT COUNT(*) FROM drugs {where}", (pattern,)).fetchone()[0]
+            total = conn.execute(f"SELECT COUNT(*) FROM drugs {where}", (pattern,)).fetchone()[0]  # nosec B608  # noqa: E501
             rows = conn.execute(
-                f"SELECT * FROM drugs {where} LIMIT ? OFFSET ?",
+                f"SELECT * FROM drugs {where} LIMIT ? OFFSET ?",  # nosec B608
                 (pattern, limit, offset),
             ).fetchall()
         return [self._row_to_drug(r) for r in rows], total
@@ -575,7 +576,7 @@ class GraphStore:
                 f"""
                 SELECT * FROM interactions
                 WHERE drug_a_id IN ({placeholders}) OR drug_b_id IN ({placeholders})
-                """,
+                """,  # nosec B608
                 drug_ids + drug_ids,
             ).fetchall()
         return [self._row_to_interaction(r) for r in rows]
@@ -619,7 +620,7 @@ class GraphStore:
                 FROM adverse_events ae
                 JOIN adverse_event_drugs aed ON ae.id = aed.event_id
                 WHERE aed.drug_id IN ({placeholders})
-                """,
+                """,  # nosec B608
                 drug_ids,
             ).fetchall()
         return [
@@ -668,7 +669,7 @@ class GraphStore:
         placeholders = ",".join("?" * len(drug_ids))
         with self._connect() as conn:
             rows = conn.execute(
-                f"SELECT * FROM genetic_guidelines WHERE drug_id IN ({placeholders})",
+                f"SELECT * FROM genetic_guidelines WHERE drug_id IN ({placeholders})",  # nosec B608
                 drug_ids,
             ).fetchall()
         return [GeneticGuideline(**dict(r)) for r in rows]
@@ -927,7 +928,7 @@ class GraphStore:
         params.extend([limit, offset])
         with self._connect() as conn:
             rows = conn.execute(
-                f"SELECT * FROM audit_log {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                f"SELECT * FROM audit_log {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",  # nosec B608
                 params,
             ).fetchall()
         return [dict(r) for r in rows]
@@ -1079,7 +1080,7 @@ class GraphStore:
         placeholders = ",".join("?" * len(drug_ids))
         with self._connect() as conn:
             rows = conn.execute(
-                f"SELECT * FROM food_interactions WHERE drug_id IN ({placeholders})",
+                f"SELECT * FROM food_interactions WHERE drug_id IN ({placeholders})",  # nosec B608
                 drug_ids,
             ).fetchall()
         return [dict(r) for r in rows]

@@ -130,7 +130,8 @@ class LabelParserAgent(BaseAgent):
             severity = self._infer_severity_from_text(label_text, mentioned_name)
 
             interaction_id = hashlib.md5(
-                f"label:{drug.id}:{mentioned_drug.id}".encode()
+                f"label:{drug.id}:{mentioned_drug.id}".encode(),
+                usedforsecurity=False,
             ).hexdigest()[:12]
 
             interaction = Interaction(
