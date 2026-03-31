@@ -146,6 +146,16 @@ jobs:
             -p 8000:8000 \
             -e MEDGRAPH_DB_PATH=/tmp/smoke.db \
             medgraph:ci-${{ github.sha }}
-          sleep 5
-          curl -sf http://localhost:8000/health | grep -q '"status":"ok"'
+          # Wait up to 30s for container to be ready (migration + seed + uvicorn startup)
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health | grep -q '"status":"ok"'; then
+              echo "Health check passed after ${i}s"
+              docker stop medgraph-smoke
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Container failed to become healthy within 30s"
+          docker logs medgraph-smoke
           docker stop medgraph-smoke
+          exit 1
